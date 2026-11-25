@@ -1,6 +1,6 @@
-/* Réviz'Med v1.2 — service worker : coquille hors-ligne.
+/* Réviz'Med v1.2.1 — service worker : coquille hors-ligne.
    Les requêtes vers api.github.com ne sont jamais mises en cache. */
-const V = 'revizmed-v1.2.0';
+const V = 'revizmed-v1.2.1';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon.svg'];
 
 self.addEventListener('install', e => {
