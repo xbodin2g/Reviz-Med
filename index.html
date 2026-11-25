@@ -694,7 +694,7 @@ noscript{display:block;padding:100px 20px;text-align:center;font-size:15px}
   <button data-action="export-json">Exporter</button>
   <button data-action="import">Importer</button>
   <button data-action="settings">Réglages</button>
-  <span>Réviz'Med v1.2.1</span>
+  <span>Réviz'Med v1.2.2</span>
 </footer>
 
 <div class="scrim" id="scrim" data-action="scrim"></div>
@@ -807,7 +807,7 @@ noscript{display:block;padding:100px 20px;text-align:center;font-size:15px}
     </div>
     <div class="danger-zone">
       <div class="slabel">Zone sensible</div>
-      <div class="sdesc" style="margin-bottom:9px">Efface toutes les notes de toutes les matières. Annulable juste après.</div>
+      <div class="sdesc" style="margin-bottom:9px">Efface toutes les notes, sur cet appareil <b>et sur tous vos appareils synchronisés</b>. Le programme est conservé. Annulable juste après.</div>
       <button class="btn danger full" data-action="reset-all"><svg class="ic"><use href="#i-trash"/></svg>Tout réinitialiser</button>
     </div>
 
@@ -826,7 +826,7 @@ noscript{display:block;padding:100px 20px;text-align:center;font-size:15px}
         <div><kbd>Échap</kbd> Fermer</div><div><kbd>Ctrl</kbd>+<kbd>P</kbd> Imprimer</div>
       </div>
     </div>
-    <div class="about">Réviz'Med v1.2.1 — conçu pour réviser sereinement en PASS / L.AS 🩺<br>Notes locales + coffre GitHub chiffré : personne d'autre ne peut les lire.</div>
+    <div class="about">Réviz'Med v1.2.2 — conçu pour réviser sereinement en PASS / L.AS 🩺<br>Notes locales + coffre GitHub chiffré : personne d'autre ne peut les lire.</div>
   </div>
 </div>
 
@@ -875,7 +875,7 @@ noscript{display:block;padding:100px 20px;text-align:center;font-size:15px}
 
 <script>
 'use strict';
-const APPV='1.2.1', LSK='revizmed:v1', SYNC_KEY='revizmed:sync', VAULT_FILE='revizmed-vault.json', N=10;
+const APPV='1.2.2', LSK='revizmed:v1', SYNC_KEY='revizmed:sync', VAULT_FILE='revizmed-vault.json', N=10;
 const HUES=['ann','ctrl','ebc','qs','info','warn','tc','opt'];
 const HUE_NAMES={ann:'Violet',ctrl:'Bleu',ebc:'Ambre',qs:'Magenta',info:'Cyan',warn:'Orange',tc:'Vert',opt:'Rouge'};
 const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -935,15 +935,21 @@ function codeOf(d){
 }
 
 /* ---------------- État local ---------------- */
-function defaultState(){return{version:1,settings:{seuil:10,max:20,theme:'auto',sound:true,autoNext:true,demo:false},overrides:{},grades:{},activity:[],subjects:defaultSubjects(),types:defaultTypes(),meta:{del:{sub:{},typ:{},itm:{}}},ui:{view:'home',filter:'all',sort:'prog',order:{tc:defaultSubjects().filter(s=>s.cat==='tc').map(s=>s.id),opt:defaultSubjects().filter(s=>s.cat==='opt').map(s=>s.id)},installDismissed:false,tipDismissed:false},updatedAt:Date.now()};}
+function defaultMeta(){return{del:{sub:{},typ:{},itm:{}},resetAt:0,ovAt:0,subReset:{}};}
+function defaultState(){return{version:1,settings:{seuil:10,max:20,theme:'auto',sound:true,autoNext:true,demo:false},overrides:{},grades:{},activity:[],subjects:defaultSubjects(),types:defaultTypes(),meta:defaultMeta(),ui:{view:'home',filter:'all',sort:'prog',order:{tc:defaultSubjects().filter(s=>s.cat==='tc').map(s=>s.id),opt:defaultSubjects().filter(s=>s.cat==='opt').map(s=>s.id)},installDismissed:false,tipDismissed:false},updatedAt:Date.now()};}
 function normalize(st){
   const d=defaultState();
   st.settings=Object.assign(d.settings,st.settings||{});
   st.ui=Object.assign(d.ui,st.ui||{});
   st.subjects=Array.isArray(st.subjects)&&st.subjects.length?st.subjects:d.subjects;
   st.types=Array.isArray(st.types)&&st.types.length?st.types:d.types;
-  st.meta=st.meta&&st.meta.del?st.meta:{del:{sub:{},typ:{},itm:{}}};
+  st.meta=st.meta&&typeof st.meta==='object'?st.meta:defaultMeta();
+  if(!st.meta.del||typeof st.meta.del!=='object')st.meta.del={sub:{},typ:{},itm:{}};
   ['sub','typ','itm'].forEach(k=>{if(!st.meta.del[k]||typeof st.meta.del[k]!=='object')st.meta.del[k]={};});
+  st.meta.resetAt=+st.meta.resetAt||0;
+  st.meta.ovAt=+st.meta.ovAt||0;
+  if(!st.meta.subReset||typeof st.meta.subReset!=='object')st.meta.subReset={};
+  Object.keys(st.meta.subReset).forEach(k=>{st.meta.subReset[k]=+st.meta.subReset[k]||0;});
   const seenS=new Set();
   st.subjects=st.subjects.filter(s=>s&&s.id&&!seenS.has(String(s.id))&&seenS.add(String(s.id))).map(s=>({id:String(s.id),name:String(s.name||'Matière').slice(0,40),short:String(s.short||s.name||'Mat.').slice(0,12),cat:s.cat==='opt'?'opt':'tc',t:+s.t||0}));
   if(!st.subjects.length)st.subjects=d.subjects;
@@ -954,6 +960,7 @@ function normalize(st){
   const validKeys=new Set();st.types.forEach(t=>t.items.forEach(it=>validKeys.add(t.id+':'+it.id)));
   st.overrides=st.overrides&&typeof st.overrides==='object'?st.overrides:{};
   Object.keys(st.overrides).forEach(k=>{if(!st.subjects.some(s=>s.id===k))delete st.overrides[k];});
+  Object.keys(st.meta.subReset).forEach(k=>{if(!st.subjects.some(s=>s.id===k))delete st.meta.subReset[k];});
   st.grades=st.grades&&typeof st.grades==='object'?st.grades:{};
   st.activity=Array.isArray(st.activity)?st.activity.slice(0,60):[];
   ['tc','opt'].forEach(cat=>{
@@ -1070,10 +1077,26 @@ function pushUndo(label){
 function undo(){
   const u=undoStack.pop();if(!u)return;
   closeAllSheets();
+  const before=state.meta||defaultMeta();
+  const uMeta=u.meta||defaultMeta();
+  const crossesReset=(+before.resetAt||0)!==(+uMeta.resetAt||0)
+    ||JSON.stringify(before.subReset||{})!==JSON.stringify(uMeta.subReset||{});
   state.grades=u.g;state.overrides=u.o;state.activity=u.a;state.ui.order=u.ord;
-  state.subjects=u.subs;state.types=u.typs;state.meta=u.meta;
+  state.subjects=u.subs;state.types=u.typs;state.meta=uMeta;
+  if(crossesReset){
+    /* On annule un effacement : les notes restaurées doivent repasser
+       devant le marqueur d'effacement déjà propagé aux autres appareils. */
+    const now=Date.now();
+    Object.keys(state.grades).forEach(sid=>{
+      const g=state.grades[sid];
+      Object.keys(g).forEach(k=>{g[k]=g[k].map(c=>c?{v:c.v,t:now}:null);});
+    });
+    state.meta.ovAt=now;
+    state.activity=state.activity.map(a=>Object.assign({},a,{t:Math.max(a.t||0,now)}));
+  }
   rebuildModel();markDirty();refreshAll();updateUndoBtn();
   toast('undo','Annulé : '+u.label,{ms:3500});play('undo');
+  if(crossesReset)syncFlush();
 }
 function updateUndoBtn(){const b=$('#btnUndo');if(b)b.disabled=undoStack.length===0;}
 
@@ -1451,6 +1474,7 @@ function setSeuilValue(v){
   v=Math.min(Math.max(0,Math.round(v*2)/2),state.settings.max);
   state.settings.seuil=v;markDirty();recolorAll();syncSeuilUI();
 }
+function touchOverrides(){state.meta.ovAt=Date.now();}
 function syncSeuilUI(){
   const st=state.settings;
   const r=$('#setSeuil');
@@ -1872,13 +1896,17 @@ function handleImportFile(file){
       const p=JSON.parse(rd.result);
       if(!p||p.app!=='revizmed'||!p.state||typeof p.state.grades!=='object')throw new Error('format');
       let n=0;Object.values(p.state.grades).forEach(g=>Object.values(g).forEach(a=>{if(Array.isArray(a))a.forEach(c=>{if(filled(c))n++;});}));
-      openConfirm({title:'Importer cette sauvegarde ?',body:n+' note'+(n>1?'s':'')+' trouvée'+(n>1?'s':'')+'. Les données actuelles (programme inclus) seront remplacées. Annulable juste après.',label:'Importer',danger:false,cb:()=>{
+      openConfirm({title:'Importer cette sauvegarde ?',body:n+' note'+(n>1?'s':'')+' trouvée'+(n>1?'s':'')+'. Les données actuelles (programme inclus) seront remplacées sur cet appareil et sur vos appareils synchronisés. Annulable juste après.',label:'Importer',danger:false,cb:()=>{
         pushUndo('Import de sauvegarde');
         const inc=normalize(clone(p.state));
+        const now=Date.now();
         state.subjects=inc.subjects;state.types=inc.types;state.meta=inc.meta;
         state.grades=inc.grades;state.overrides=inc.overrides;state.activity=inc.activity;state.ui.order=inc.ui.order;
+        /* L'import doit lui aussi passer devant les effacements déjà propagés. */
+        Object.keys(state.grades).forEach(sid=>{const g=state.grades[sid];Object.keys(g).forEach(k=>{g[k]=g[k].map(c=>c?{v:c.v,t:now}:null);});});
+        state.meta.ovAt=now;
         state.settings.demo=false;
-        rebuildModel();markDirty();closeAllSheets();refreshAll();
+        rebuildModel();markDirty();closeAllSheets();refreshAll();syncFlush();
         toast('ok','Import réussi : '+n+' notes ✓');play('celebrate');
       }});
     }catch(e){toast('bad','Fichier illisible — choisissez une sauvegarde JSON Réviz\'Med.');play('error');}
@@ -1886,12 +1914,20 @@ function handleImportFile(file){
   rd.onerror=()=>toast('bad','Impossible de lire le fichier.');
   rd.readAsText(file);
 }
-function clearGrades(label){
+/* Effacement global : marqueur horodaté propagé à tous les appareils. */
+function clearGrades(label,opts){
+  opts=opts||{};
   pushUndo(label);
+  const now=Date.now();
   state.grades={};state.activity=[];state.settings.demo=false;
+  if(opts.overrides){state.overrides={};state.meta.ovAt=now;}
+  state.meta.resetAt=now;
+  state.meta.subReset={};
   markDirty();closeAllSheets();refreshAll();
-  toast('undo',label+' — tout est reparti à zéro.',{label:'Annuler',cb:undo,ms:8000});
+  const propagating=!!(SY.cfg&&SY.key);
+  toast('undo',label+(propagating?' — effacement propagé à vos autres appareils.':' — tout est reparti à zéro.'),{label:'Annuler',cb:undo,ms:9000});
   play('clear');
+  syncFlush();
 }
 function syncDemoUI(){const b=$('#rowDemo');if(b)b.hidden=!state.settings.demo;}
 function updateBanners(){
@@ -2040,6 +2076,7 @@ function prgChanged(label,undoable){
   rebuildModel();markDirty();refreshAll();prgRender();
   if(label)toast(undoable?'undo':'ok',label,undoable?{label:'Annuler',cb:undo,ms:8000}:undefined);
   play(undoable?'clear':'ok');
+  if(undoable)syncFlush();
 }
 function prgSubSave(sid){
   const s=SUBJ[sid];if(!s)return;
@@ -2065,13 +2102,16 @@ function prgSubAdd(){
 function prgSubDel(sid){
   const s=SUBJ[sid];if(!s)return;
   const nn=notesOfSub(sid);
-  openConfirm({title:'Supprimer « '+s.name+' » ?',body:nn+' note'+(nn>1?'s':'')+' seront supprimées avec la matière. Vous pourrez annuler juste après.',label:'Supprimer',danger:true,cb:()=>{
+  openConfirm({title:'Supprimer « '+s.name+' » ?',body:nn+' note'+(nn>1?'s':'')+' seront supprimées avec la matière, sur tous vos appareils synchronisés. Vous pourrez annuler juste après.',label:'Supprimer',danger:true,cb:()=>{
     pushUndo('Suppression de '+s.name);
-    state.meta.del.sub[sid]=Date.now();
+    const now=Date.now();
+    state.meta.del.sub[sid]=now;
     state.subjects=state.subjects.filter(x=>x.id!==sid);
     state.ui.order.tc=state.ui.order.tc.filter(x=>x!==sid);
     state.ui.order.opt=state.ui.order.opt.filter(x=>x!==sid);
-    delete state.grades[sid];delete state.overrides[sid];
+    delete state.grades[sid];
+    if(state.overrides[sid]!=null){delete state.overrides[sid];touchOverrides();}
+    delete state.meta.subReset[sid];
     state.activity=state.activity.filter(a=>a.s!==sid);
     PRG.editSub=null;prgChanged('« '+s.name+' » supprimée.',true);
   }});
@@ -2094,7 +2134,7 @@ function prgTypAdd(){
 function prgTypDel(tid){
   const t=TYPES.find(x=>x.id===tid);if(!t)return;
   const nn=notesOfType(tid);
-  openConfirm({title:'Supprimer « '+t.label+' » ?',body:t.items.length+' devoir'+(t.items.length>1?'s':'')+' × '+SUBJECTS.length+' matières, soit '+nn+' note'+(nn>1?'s':'')+' supprimées. Annulable juste après.',label:'Supprimer',danger:true,cb:()=>{
+  openConfirm({title:'Supprimer « '+t.label+' » ?',body:t.items.length+' devoir'+(t.items.length>1?'s':'')+' × '+SUBJECTS.length+' matières, soit '+nn+' note'+(nn>1?'s':'')+' supprimées sur tous vos appareils. Annulable juste après.',label:'Supprimer',danger:true,cb:()=>{
     pushUndo('Suppression de '+t.label);
     const now=Date.now();
     state.meta.del.typ[tid]=now;
@@ -2127,7 +2167,7 @@ function prgItmDel(tid,iid){
   const t=TYPES.find(x=>x.id===tid);if(!t)return;
   const it=t.items.find(x=>x.id===iid);if(!it)return;
   const key=tid+':'+iid,nn=notesOfDevoir(key);
-  openConfirm({title:'Supprimer « '+t.single+' '+it.label+' » ?',body:'Ce devoir sera retiré des '+SUBJECTS.length+' matières ('+nn+' note'+(nn>1?'s':'')+' supprimées). Annulable juste après.',label:'Supprimer',danger:true,cb:()=>{
+  openConfirm({title:'Supprimer « '+t.single+' '+it.label+' » ?',body:'Ce devoir sera retiré des '+SUBJECTS.length+' matières ('+nn+' note'+(nn>1?'s':'')+' supprimées) sur tous vos appareils. Annulable juste après.',label:'Supprimer',danger:true,cb:()=>{
     pushUndo('Suppression de '+t.single+' '+it.label);
     state.meta.del.itm[key]=Date.now();
     t.items=t.items.filter(x=>x.id!==iid);
@@ -2238,11 +2278,18 @@ function syncPayload(){return{v:3,grades:state.grades,overrides:state.overrides,
 function samePayload(a,b){return JSON.stringify([a.grades,a.overrides,a.activity,a.order,a.subjects,a.types,a.meta,a.seuil,a.max])===JSON.stringify([b.grades,b.overrides,b.activity,b.order,b.subjects,b.types,b.meta,b.seuil,b.max]);}
 function mergePayload(a,b){
   const newer=(a.updatedAt||0)>=(b.updatedAt||0)?a:b;
+  const am=a.meta||{},bm=b.meta||{};
   const del={sub:{},typ:{},itm:{}};
   ['sub','typ','itm'].forEach(k=>{
-    const A=(a.meta&&a.meta.del&&a.meta.del[k])||{},B=(b.meta&&b.meta.del&&b.meta.del[k])||{};
-    new Set([...Object.keys(A),...Object.keys(B)]).forEach(id=>{del[k][id]=Math.max(A[id]||0,B[id]||0);});
+    const A=(am.del&&am.del[k])||{},B=(bm.del&&bm.del[k])||{};
+    new Set([...Object.keys(A),...Object.keys(B)]).forEach(id=>{del[k][id]=Math.max(+A[id]||0,+B[id]||0);});
   });
+  /* Marqueurs d'effacement : ils gagnent toujours sur les notes plus anciennes. */
+  const resetAt=Math.max(+am.resetAt||0,+bm.resetAt||0);
+  const ovAt=Math.max(+am.ovAt||0,+bm.ovAt||0);
+  const subReset={};
+  const SA=am.subReset||{},SB=bm.subReset||{};
+  new Set([...Object.keys(SA),...Object.keys(SB)]).forEach(id=>{subReset[id]=Math.max(+SA[id]||0,+SB[id]||0);});
   const sm=new Map();
   [...(a.subjects||[]),...(b.subjects||[])].forEach(s=>{if(!s||!s.id)return;const e=sm.get(s.id);if(!e||(s.t||0)>=(e.t||0))sm.set(s.id,clone(s));});
   const subjects=[...sm.values()].filter(s=>!(del.sub[s.id]&&del.sub[s.id]>=(s.t||0)));
@@ -2275,6 +2322,7 @@ function mergePayload(a,b){
   const grades={};
   subjects.forEach(s=>{
     const g={};
+    const cut=Math.max(resetAt,+subReset[s.id]||0);
     types.forEach(t=>t.items.forEach(it=>{
       const key=t.id+':'+it.id;
       const la=(a.grades&&a.grades[s.id]&&a.grades[s.id][key])||EMPTY;
@@ -2283,24 +2331,29 @@ function mergePayload(a,b){
       for(let i=0;i<N;i++){
         const ca=la[i],cb=lb[i];
         const ta=(ca&&ca.t)||0,tb=(cb&&cb.t)||0;
-        const pick=ta>=tb?ca:cb;
+        let pick=ta>=tb?ca:cb;
+        if(pick&&cut>0&&(pick.t||0)<=cut)pick=null;
         if(pick){arr[i]={v:pick.v==null?null:pick.v,t:pick.t||0};any=true;}
       }
       if(any)g[key]=arr;
     }));
     if(Object.keys(g).length)grades[s.id]=g;
   });
-  const overrides=clone(newer.overrides||{});
+  const ovSide=((+am.ovAt||a.updatedAt||0)>=(+bm.ovAt||b.updatedAt||0))?a:b;
+  const overrides=clone(ovSide.overrides||{});
   Object.keys(overrides).forEach(k=>{if(!subjects.some(s=>s.id===k))delete overrides[k];});
   const sids=new Set(subjects.map(s=>s.id));
   const dkeys=new Set();types.forEach(t=>t.items.forEach(it=>dkeys.add(t.id+':'+it.id)));
   const seen=new Set();const activity=[];
   [...(a.activity||[]),...(b.activity||[])].sort((x,y)=>(y.t||0)-(x.t||0)).forEach(x=>{
     if(!sids.has(x.s)||!dkeys.has(x.d))return;
+    const cut=Math.max(resetAt,+subReset[x.s]||0);
+    if(cut>0&&(x.t||0)<=cut)return;
     const k=x.s+'|'+x.d+'|'+x.i+'|'+x.t+'|'+x.v;
     if(!seen.has(k)){seen.add(k);activity.push(x);}
   });
-  return{v:3,updatedAt:Math.max(a.updatedAt||0,b.updatedAt||0),subjects,types,meta:{del},order,grades,overrides,activity:activity.slice(0,60),seuil:isFinite(newer.seuil)?newer.seuil:10,max:[10,20,100].includes(+newer.max)?+newer.max:20};
+  Object.keys(subReset).forEach(k=>{if(!sids.has(k))delete subReset[k];});
+  return{v:3,updatedAt:Math.max(a.updatedAt||0,b.updatedAt||0),subjects,types,meta:{del,resetAt,ovAt,subReset},order,grades,overrides,activity:activity.slice(0,60),seuil:isFinite(newer.seuil)?newer.seuil:10,max:[10,20,100].includes(+newer.max)?+newer.max:20};
 }
 function adoptPayload(p){
   SY.applying=true;
@@ -2352,6 +2405,11 @@ function syncSchedule(){
   if(!SY.cfg||!SY.key||!SY.cfg.auto||SY.busy)return;
   clearTimeout(SY.timer);
   SY.timer=setTimeout(()=>syncNow(false),4000);
+}
+function syncFlush(){
+  if(!SY.cfg||!SY.key)return;
+  clearTimeout(SY.timer);
+  syncNow(false);
 }
 function syncSetStatus(st){
   SY.status=st;
@@ -2435,7 +2493,7 @@ function syncRenderSheet(){
   const st=SY.status;
   const last=SY.cfg.lastSync?relTime(SY.cfg.lastSync):'jamais';
   body.innerHTML=
-    '<div class="sy-status '+st+'"><span class="sd"></span><div><b>'+({ready:'Synchronisé ✓',syncing:'Synchronisation en cours…',error:'Erreur — vérifiez le jeton / réseau',offline:'Hors-ligne — en attente du réseau'}[st]||'Prêt')+'</b><span>Dernière synchro : '+last+' · fusion automatique (notes, matières, devoirs)</span></div></div>'
+    '<div class="sy-status '+st+'"><span class="sd"></span><div><b>'+({ready:'Synchronisé ✓',syncing:'Synchronisation en cours…',error:'Erreur — vérifiez le jeton / réseau',offline:'Hors-ligne — en attente du réseau'}[st]||'Prêt')+'</b><span>Dernière synchro : '+last+' · fusion automatique, réinitialisations propagées</span></div></div>'
     +'<div class="sy-meta"><span>Compte GitHub : <b>@'+esc(SY.cfg.login||'?')+'</b></span><span>Coffre : <a href="https://gist.github.com/'+esc(SY.cfg.gistId)+'" target="_blank" rel="noopener">gist secret '+esc(String(SY.cfg.gistId).slice(0,10))+'…</a> (contenu chiffré)</span><span>Appareil : '+esc(SY.cfg.deviceId.slice(0,8))+'</span></div>'
     +'<div class="srow" style="padding-top:0"><div><div class="slabel">Synchro automatique</div><div class="sdesc">Envoi ~4 s après chaque modification, réception à l\'ouverture.</div></div><label class="switch"><input type="checkbox" id="syAuto"'+(SY.cfg.auto?' checked':'')+'><span class="track"></span></label></div>'
     +'<div class="sgrid">'
@@ -2670,13 +2728,15 @@ document.addEventListener('click',e=>{
     case'ov-open':{closePop();const chip=$('#subjSeuilChip');if(chip)openPop(chip,popSeuilOverrideHTML(s),s);break;}
     case'print-subj':closePop();openPrint(s);break;
     case'export-subj':closePop();exportCSV(s);break;
-    case'reset-subj':closePop();openConfirm({title:'Réinitialiser '+SUBJ[s].name+' ?',body:'Toutes les notes de cette matière seront effacées. Annulable juste après.',label:'Réinitialiser',danger:true,cb:()=>{
+    case'reset-subj':closePop();openConfirm({title:'Réinitialiser '+SUBJ[s].name+' ?',body:'Toutes les notes de cette matière seront effacées, sur cet appareil et sur vos appareils synchronisés. Annulable juste après.',label:'Réinitialiser',danger:true,cb:()=>{
       pushUndo('Réinitialisation '+SUBJ[s].name);
-      const g=state.grades[s]||{};
-      Object.keys(g).forEach(dk=>{g[dk]=g[dk].map(()=>({v:null,t:Date.now()}));});
+      const now=Date.now();
+      state.meta.subReset[s]=now;
+      delete state.grades[s];
       state.activity=state.activity.filter(x=>x.s!==s);
       markDirty();closeAllSheets();refreshAll();
-      toast('undo',SUBJ[s].name+' réinitialisée.',{label:'Annuler',cb:undo,ms:8000});play('clear');
+      toast('undo',SUBJ[s].name+' réinitialisée'+((SY.cfg&&SY.key)?' sur tous vos appareils.':'.'),{label:'Annuler',cb:undo,ms:9000});play('clear');
+      syncFlush();
     }});break;
     case'edkey':edKey(t.dataset.k);break;
     case'edok':edCommitExplicit();break;
@@ -2709,7 +2769,7 @@ document.addEventListener('click',e=>{
     case'export-json':exportJSON();break;
     case'export-csv':exportCSV();break;
     case'import':$('#fileImport').click();break;
-    case'reset-all':openConfirm({title:'Tout réinitialiser ?',body:'Toutes les notes seront effacées. Le programme (matières et devoirs) et les réglages sont conservés. Annulable juste après.',label:'Tout effacer',danger:true,cb:()=>{state.overrides={};clearGrades('Réinitialisation complète');}});break;
+    case'reset-all':openConfirm({title:'Tout réinitialiser ?',body:'Toutes les notes seront effacées sur cet appareil ET sur tous vos appareils synchronisés (l\'effacement est propagé, les notes ne reviendront pas). Le programme et les réglages sont conservés. Annulable juste après.',label:'Tout effacer partout',danger:true,cb:()=>clearGrades('Réinitialisation complète',{overrides:true})});break;
     case'seuil-chip':setSeuilValue(+t.dataset.v);play('tick');break;
     case'queue-all':queueAll=!queueAll;renderQueue();break;
     case'queue-refaire':{const full=devoStatus(s,d).tries===N;openEditor(s,d,nextEmpty(s,d));if(full)toast('info','10 essais remplis — modifiez le dernier ou effacez une case.');break;}
@@ -2768,7 +2828,7 @@ document.addEventListener('input',e=>{
   else if(el.id==='ovRange'&&POP&&POP.sid){
     if(!POP.undoPushed){pushUndo('Seuil matière');POP.undoPushed=true;}
     state.overrides[POP.sid]=Math.min(Math.max(0,+el.value),state.settings.max);
-    markDirty();recolorAll();syncSeuilUI();
+    touchOverrides();markDirty();recolorAll();syncSeuilUI();
   }
   else if(el.id==='searchInput')runSearch(el.value);
 });
@@ -2777,7 +2837,9 @@ document.addEventListener('change',e=>{
   if(el.id==='setMax'){
     state.settings.max=+el.value;
     if(state.settings.seuil>state.settings.max)state.settings.seuil=state.settings.max;
-    Object.keys(state.overrides).forEach(k=>{if(state.overrides[k]>state.settings.max)state.overrides[k]=state.settings.max;});
+    let ovChanged=false;
+    Object.keys(state.overrides).forEach(k=>{if(state.overrides[k]>state.settings.max){state.overrides[k]=state.settings.max;ovChanged=true;}});
+    if(ovChanged)touchOverrides();
     markDirty();recolorAll();syncSeuilUI();
     toast('info','Barème : notes sur '+state.settings.max+'.');
   }
@@ -2788,7 +2850,7 @@ document.addEventListener('change',e=>{
     if(!POP.undoPushed){pushUndo('Seuil matière');POP.undoPushed=true;}
     if(el.checked)delete state.overrides[POP.sid];
     else state.overrides[POP.sid]=state.settings.seuil;
-    markDirty();recolorAll();syncSeuilUI();
+    touchOverrides();markDirty();recolorAll();syncSeuilUI();
     if(CUR.view==='subject')renderSubject(CUR.s);
   }
   else if(el.id==='sortSel'){state.ui.sort=el.value;markDirty();renderSubject(CUR.s);play('tick');}
