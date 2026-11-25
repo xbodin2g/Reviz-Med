@@ -573,7 +573,6 @@ html.theming, html.theming *{transition:background-color .3s,color .3s,border-co
   .p-table tr{break-inside:avoid}
   .p-foot{position:fixed;bottom:0;left:0;right:0;background:#fff}
 }
-/* ---- Éditeur de programme ---- */
 .prg-tabs{margin-bottom:12px}
 .prg-sec{font:700 10.5px 'Inter';text-transform:uppercase;letter-spacing:1.5px;display:flex;align-items:center;gap:8px;margin:15px 0 6px}
 .prg-sec:first-child{margin-top:2px}
@@ -695,7 +694,7 @@ noscript{display:block;padding:100px 20px;text-align:center;font-size:15px}
   <button data-action="export-json">Exporter</button>
   <button data-action="import">Importer</button>
   <button data-action="settings">Réglages</button>
-  <span>Réviz'Med v1.2</span>
+  <span>Réviz'Med v1.2.1</span>
 </footer>
 
 <div class="scrim" id="scrim" data-action="scrim"></div>
@@ -827,7 +826,7 @@ noscript{display:block;padding:100px 20px;text-align:center;font-size:15px}
         <div><kbd>Échap</kbd> Fermer</div><div><kbd>Ctrl</kbd>+<kbd>P</kbd> Imprimer</div>
       </div>
     </div>
-    <div class="about">Réviz'Med v1.2 — conçu pour réviser sereinement en PASS / L.AS 🩺<br>Notes locales + coffre GitHub chiffré : personne d'autre ne peut les lire.</div>
+    <div class="about">Réviz'Med v1.2.1 — conçu pour réviser sereinement en PASS / L.AS 🩺<br>Notes locales + coffre GitHub chiffré : personne d'autre ne peut les lire.</div>
   </div>
 </div>
 
@@ -876,7 +875,7 @@ noscript{display:block;padding:100px 20px;text-align:center;font-size:15px}
 
 <script>
 'use strict';
-const APPV='1.2.0', LSK='revizmed:v1', SYNC_KEY='revizmed:sync', VAULT_FILE='revizmed-vault.json', N=10;
+const APPV='1.2.1', LSK='revizmed:v1', SYNC_KEY='revizmed:sync', VAULT_FILE='revizmed-vault.json', N=10;
 const HUES=['ann','ctrl','ebc','qs','info','warn','tc','opt'];
 const HUE_NAMES={ann:'Violet',ctrl:'Bleu',ebc:'Ambre',qs:'Magenta',info:'Cyan',warn:'Orange',tc:'Vert',opt:'Rouge'};
 const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -966,7 +965,7 @@ function normalize(st){
   st.subjects.forEach(s=>{
     const g=st.grades[s.id];if(!g||typeof g!=='object'){st.grades[s.id]={};return;}
     Object.keys(g).forEach(k=>{if(!validKeys.has(k))delete g[k];});
-    DEVOIRS_KEYS(validKeys).forEach(dk=>{
+    [...validKeys].forEach(dk=>{
       let a=g[dk];if(!Array.isArray(a)){delete g[dk];return;}
       a=a.slice(0,N).map(c=>{
         if(c&&typeof c==='object'&&isFinite(c.t)){
@@ -984,7 +983,6 @@ function normalize(st){
   st.settings.seuil=Math.min(Math.max(0,+st.settings.seuil||0),st.settings.max);
   return st;
 }
-function DEVOIRS_KEYS(set){return[...set];}
 let state, storageOK=true, warnedStorage=false;
 function load(){
   try{
@@ -1476,15 +1474,22 @@ function syncSeuilUI(){
   if(ED)edUpdate();
 }
 
-/* ---------------- Feuilles ---------------- */
-const SHEETS=[];const openers=new Map();
+/* ---------------- Feuilles : empilement ordonné ---------------- */
+const SHEETS=[];const openers=new Map();const SHEET_Z0=70;
+function sheetStackLayout(){
+  const scrim=$('#scrim'),n=SHEETS.length;
+  if(!n){scrim.classList.remove('on');scrim.style.zIndex='';document.body.classList.remove('no-scroll');return;}
+  SHEETS.forEach((id,ix)=>{const el=$('#'+id);if(el)el.style.zIndex=String(SHEET_Z0+(ix+1)*2);});
+  scrim.style.zIndex=String(SHEET_Z0+n*2-1);
+  scrim.classList.add('on');
+  document.body.classList.add('no-scroll');
+}
 function openSheet(id){
   closePop();
   if(SHEETS[SHEETS.length-1]===id)return;
   openers.set(id,document.activeElement);
   SHEETS.push(id);
-  $('#scrim').classList.add('on');
-  document.body.classList.add('no-scroll');
+  sheetStackLayout();
   const el=$('#'+id);el.classList.add('open');
   requestAnimationFrame(()=>{if(id==='sheetSearch'){const i=$('#searchInput');if(i)i.focus();}else el.focus({preventScroll:true});});
 }
@@ -1493,10 +1498,11 @@ function closeTop(){
   const el=$('#'+id);
   el.style.transition='';el.style.transform='';
   el.classList.remove('open');
+  setTimeout(()=>{if(!el.classList.contains('open'))el.style.zIndex='';},380);
   if(id==='sheetEditor')edCleanup();
   if(id==='sheetDrawer')DW=null;
   if(id==='sheetConfirm')CFcb=null;
-  if(!SHEETS.length){$('#scrim').classList.remove('on');document.body.classList.remove('no-scroll');}
+  sheetStackLayout();
   const op=openers.get(id);openers.delete(id);
   if(op&&op.isConnected&&op.focus)try{op.focus({preventScroll:true});}catch(e){}
 }
