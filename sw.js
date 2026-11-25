@@ -1,5 +1,7 @@
-/* Réviz'Med — service worker : coquille hors-ligne */
-const V = 'revizmed-v1.0.0';
+/* Réviz'Med v1.1 — service worker : coquille hors-ligne.
+   Les requêtes vers api.github.com ne sont jamais mises en cache :
+   la synchronisation passe toujours par le réseau en direct. */
+const V = 'revizmed-v1.1.0';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon.svg'];
 
 self.addEventListener('install', e => {
@@ -24,7 +26,6 @@ self.addEventListener('fetch', e => {
   const u = new URL(r.url);
   if (!/^https?:$/.test(u.protocol)) return;
 
-  /* Navigations : réseau d'abord, repli sur la coquille en cache */
   if (r.mode === 'navigate') {
     e.respondWith(
       fetch(r).then(res => {
@@ -36,7 +37,6 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  /* Ressources locales : cache d'abord */
   if (u.origin === location.origin) {
     e.respondWith(
       caches.match(r).then(m => m || fetch(r).then(res => {
@@ -50,7 +50,6 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  /* Polices Google : stale-while-revalidate (opaques inclus) */
   if (/(^|\.)fonts\.(googleapis|gstatic)\.com$/.test(u.hostname)) {
     e.respondWith(
       caches.match(r).then(m => {
@@ -65,4 +64,5 @@ self.addEventListener('fetch', e => {
       })
     );
   }
+  /* api.github.com et tout le reste : réseau direct, sans cache. */
 });
