@@ -1,7 +1,6 @@
-/* Réviz'Med v1.1 — service worker : coquille hors-ligne.
-   Les requêtes vers api.github.com ne sont jamais mises en cache :
-   la synchronisation passe toujours par le réseau en direct. */
-const V = 'revizmed-v1.1.0';
+/* Réviz'Med v1.2 — service worker : coquille hors-ligne.
+   Les requêtes vers api.github.com ne sont jamais mises en cache. */
+const V = 'revizmed-v1.2.0';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon.svg'];
 
 self.addEventListener('install', e => {
@@ -64,5 +63,4 @@ self.addEventListener('fetch', e => {
       })
     );
   }
-  /* api.github.com et tout le reste : réseau direct, sans cache. */
 });
