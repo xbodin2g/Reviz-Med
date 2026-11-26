@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr" data-theme="dark">
+<html lang="fr" data-theme="dark" data-fx="full" data-anim="1" data-glass="1" data-grain="1">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -15,7 +15,38 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" id="appleIcon" href="icon.svg">
 <script>
-(function(){try{var s=JSON.parse(localStorage.getItem('revizmed:v1'));var t=(s&&s.settings&&s.settings.theme)||'auto';var d=t==='dark'||(t==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){document.documentElement.dataset.theme='dark';}})();
+/* Profil de rendu décidé AVANT le premier dessin : aucune surface coûteuse
+   n'est créée sur les appareils à GPU fragile, et un arrêt brutal précédent
+   force immédiatement le mode léger. */
+(function(){
+  var D=document.documentElement,LS='revizmed:v1',BK='revizmed:boot',AK='revizmed:abrupt';
+  var s=null;try{s=JSON.parse(localStorage.getItem(LS));}catch(e){}
+  var st=(s&&s.settings)||{};
+  var t=st.theme||'auto';
+  var dark=t==='dark'||(t==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);
+  D.dataset.theme=dark?'dark':'light';
+  var coarse=false,standalone=false;
+  try{coarse=matchMedia('(pointer:coarse)').matches;}catch(e){}
+  try{standalone=matchMedia('(display-mode: standalone)').matches||!!navigator.standalone;}catch(e){}
+  var minSide=Math.min(screen.width||9999,screen.height||9999);
+  var mem=navigator.deviceMemory||8;
+  var tablet=coarse&&minSide>=600;
+  var abrupt=0;try{abrupt=+(localStorage.getItem(AK)||0)||0;}catch(e){}
+  var pending=false;try{pending=localStorage.getItem(BK)==='1';}catch(e){}
+  if(pending){abrupt=Math.min(9,abrupt+1);try{localStorage.setItem(AK,String(abrupt));}catch(e){}}
+  try{localStorage.setItem(BK,'1');}catch(e){}
+  var risky=tablet&&(standalone||mem<=4);
+  var mode=st.render||'auto';
+  var lite=(mode==='lite')||(mode!=='full'&&risky)||abrupt>=2;
+  if(abrupt>=2&&mode==='full'&&s&&s.settings){
+    try{s.settings.render='lite';localStorage.setItem(LS,JSON.stringify(s));}catch(e){}
+  }
+  D.dataset.fx=lite?'lite':'full';
+  D.dataset.anim=(lite||st.bgAnim===false)?'0':'1';
+  D.dataset.glass=(lite||st.glass===false)?'0':'1';
+  D.dataset.grain=(lite||st.grain===false)?'0':'1';
+  window.__fxBoot={risky:risky,tablet:tablet,standalone:standalone,mem:mem,abrupt:abrupt,lite:lite,minSide:minSide};
+})();
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -25,7 +56,7 @@
   --bg:#131022; --bg2:#181430; --surface:#1e1936; --surface2:#262045;
   --line:#332b56; --line2:#4a3f7d;
   --ink:#efecfb; --ink2:#b4abd8; --ink3:#7e75a9;
-  --glass:rgba(19,16,34,.78);
+  --glass:rgba(19,16,34,.78); --glass-solid:rgba(22,18,44,.97);
   --brand:#8b6cff; --brand2:#b7a4ff; --eosin:#ff4d8d;
   --ok:#2fd57f; --ok-ink:#71f0ad; --ok-bg:rgba(47,213,127,.14); --ok-line:rgba(47,213,127,.5);
   --bad:#ff4d67; --bad-ink:#ff9fae; --bad-bg:rgba(255,77,103,.15); --bad-line:rgba(255,77,103,.55); --bad-stripe:rgba(255,77,103,.10);
@@ -45,7 +76,7 @@ html[data-theme="light"]{
   --bg:#f6f3ee; --bg2:#efe9f6; --surface:#fdfcf9; --surface2:#f3effa;
   --line:#e3dcee; --line2:#c9bfe2;
   --ink:#241e42; --ink2:#5b5380; --ink3:#8f87b0;
-  --glass:rgba(246,243,238,.84);
+  --glass:rgba(246,243,238,.84); --glass-solid:rgba(247,245,240,.97);
   --brand:#6d4df0; --brand2:#8b6cff; --eosin:#e63e7e;
   --ok:#12a15c; --ok-ink:#0a6b3c; --ok-bg:#e0f6ea; --ok-line:#63cf96;
   --bad:#e11d48; --bad-ink:#a30f31; --bad-bg:#fde7ec; --bad-line:#f38ba0; --bad-stripe:rgba(225,29,72,.07);
@@ -78,15 +109,24 @@ kbd{font:600 10.5px 'Space Grotesk',monospace;background:var(--surface2);border:
 *::-webkit-scrollbar-thumb{background:linear-gradient(180deg,var(--brand),var(--eosin));border-radius:99px;border:2px solid var(--bg)}
 *::-webkit-scrollbar-thumb:hover{background:linear-gradient(180deg,var(--brand2),var(--eosin))}
 .mscroll::-webkit-scrollbar,.tsheet::-webkit-scrollbar,.pr-preview::-webkit-scrollbar{height:6px;width:6px}
+/* ---- Fond : dégradés doux, aucun blend-mode, animations optionnelles ---- */
 .bg{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
 .blob{position:absolute;border-radius:50%;opacity:var(--aurora-o)}
-.b1{width:60vmax;height:60vmax;left:-22vmax;top:-24vmax;background:radial-gradient(circle at 35% 35%,var(--brand-soft),transparent 62%);animation:drift1 64s ease-in-out infinite alternate}
-.b2{width:52vmax;height:52vmax;right:-20vmax;top:-8vmax;background:radial-gradient(circle at 60% 40%,var(--eosin-soft),transparent 60%);animation:drift2 82s ease-in-out infinite alternate}
-.b3{width:56vmax;height:56vmax;left:14vmax;bottom:-32vmax;background:radial-gradient(circle at 50% 50%,var(--tc-soft),transparent 60%);animation:drift1 95s ease-in-out infinite alternate-reverse}
-@keyframes drift1{to{transform:translate3d(9vmax,7vmax,0) rotate(18deg)}}
-@keyframes drift2{to{transform:translate3d(-8vmax,9vmax,0) rotate(-14deg)}}
-.grain{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:var(--grain-o);mix-blend-mode:overlay;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E")}
-.topbar{position:fixed;top:0;left:0;right:0;z-index:40;display:flex;align-items:center;gap:7px;padding:calc(env(safe-area-inset-top) + 8px) 12px 8px;background:var(--glass);backdrop-filter:blur(14px) saturate(1.4);-webkit-backdrop-filter:blur(14px) saturate(1.4);border-bottom:1px solid var(--line)}
+.b1{width:56vmax;height:56vmax;left:-22vmax;top:-24vmax;background:radial-gradient(circle at 35% 35%,var(--brand-soft),transparent 62%)}
+.b2{width:48vmax;height:48vmax;right:-20vmax;top:-8vmax;background:radial-gradient(circle at 60% 40%,var(--eosin-soft),transparent 60%)}
+.b3{width:52vmax;height:52vmax;left:14vmax;bottom:-32vmax;background:radial-gradient(circle at 50% 50%,var(--tc-soft),transparent 60%)}
+html[data-anim="1"] .b1{animation:drift1 72s ease-in-out infinite alternate}
+html[data-anim="1"] .b2{animation:drift2 94s ease-in-out infinite alternate}
+html[data-anim="1"] .b3{animation:drift1 110s ease-in-out infinite alternate-reverse}
+html[data-fx="lite"] .b3{display:none}
+html[data-fx="lite"] .blob{opacity:calc(var(--aurora-o) * .8)}
+@keyframes drift1{to{transform:translate3d(7vmax,5vmax,0)}}
+@keyframes drift2{to{transform:translate3d(-6vmax,7vmax,0)}}
+.grain{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:var(--grain-o);background-size:170px 170px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='170' height='170'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='170' height='170' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E")}
+html[data-grain="0"] .grain{display:none}
+/* ---- Barres : verre dépoli uniquement si autorisé ---- */
+.topbar{position:fixed;top:0;left:0;right:0;z-index:40;display:flex;align-items:center;gap:7px;padding:calc(env(safe-area-inset-top) + 8px) 12px 8px;background:var(--glass-solid);border-bottom:1px solid var(--line)}
+html[data-glass="1"] .topbar{background:var(--glass);backdrop-filter:blur(14px) saturate(1.4);-webkit-backdrop-filter:blur(14px) saturate(1.4)}
 .brand{display:flex;align-items:center;gap:9px;padding:3px 6px;border-radius:10px;flex:none}
 .brand:hover{background:var(--brand-soft)}
 .brand svg{width:30px;height:30px}
@@ -111,7 +151,8 @@ kbd{font:600 10.5px 'Space Grotesk',monospace;background:var(--surface2);border:
 @media(min-width:1000px){#btnPrintTop{display:grid}}
 .sybtn::after{content:"";position:absolute;right:4px;top:4px;width:8px;height:8px;border-radius:99px;background:var(--ink3);border:1.5px solid var(--surface)}
 .sybtn[data-state="ready"]::after{background:var(--ok)}
-.sybtn[data-state="syncing"]::after{background:var(--info);animation:blink 1s infinite}
+.sybtn[data-state="syncing"]::after{background:var(--info)}
+html[data-anim="1"] .sybtn[data-state="syncing"]::after{animation:blink 1s infinite}
 .sybtn[data-state="locked"]::after{background:var(--warn)}
 .sybtn[data-state="error"]::after{background:var(--bad)}
 .sybtn[data-state="offline"]::after{background:var(--warn)}
@@ -121,7 +162,8 @@ kbd{font:600 10.5px 'Space Grotesk',monospace;background:var(--surface2);border:
 @media(max-width:400px){.topbar{gap:4px;padding-left:8px;padding-right:8px}.iconbtn{width:32px;height:32px}.searchbtn{width:32px;height:32px}}
 @media(max-width:379px){.brand-t i{display:none}#btnTheme{display:none}.brand-t b{font-size:15px}}
 @media(max-width:339px){#btnUndo{display:none}.brand-t b{font-size:14px}}
-.subbar{position:sticky;top:calc(env(safe-area-inset-top) + 52px);z-index:35;background:var(--glass);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.subbar{position:sticky;top:calc(env(safe-area-inset-top) + 52px);z-index:35;background:var(--glass-solid);border-bottom:1px solid var(--line)}
+html[data-glass="1"] .subbar{background:var(--glass);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
 .pills{display:flex;align-items:center;gap:6px;overflow-x:auto;padding:8px 12px;scrollbar-width:none;max-width:1240px;margin:0 auto}
 .pills::-webkit-scrollbar{display:none}
 .pill{flex:none;display:flex;align-items:center;gap:7px;height:32px;padding:0 12px;border-radius:99px;border:1px solid var(--line);background:var(--surface);font:600 12px 'Inter';color:var(--ink2);transition:.15s;user-select:none}
@@ -136,8 +178,11 @@ main{position:relative;z-index:2;max-width:1240px;margin:0 auto;padding:14px 12p
 .view.enter{animation:viewIn .28s cubic-bezier(.2,.7,.3,1)}
 @keyframes viewIn{from{opacity:0;transform:translateY(8px)}}
 .reveal{animation:rise .5s cubic-bezier(.2,.7,.3,1) both;animation-delay:calc(var(--i,0)*50ms)}
+html[data-fx="lite"] .reveal{animation:rise .24s ease both;animation-delay:0s}
+html[data-fx="lite"] .view.enter{animation:none}
 @keyframes rise{from{opacity:0;transform:translateY(14px)}}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow-sm)}
+html[data-fx="lite"] .card{box-shadow:none}
 .card-h{display:flex;align-items:center;gap:9px;padding:12px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap}
 .card-h h2{font-size:14.5px;font-weight:700;letter-spacing:.2px}
 .chip{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:99px;border:1px solid var(--line);background:var(--surface2);font:600 11px 'Inter';color:var(--ink2);white-space:nowrap}
@@ -172,6 +217,7 @@ main{position:relative;z-index:2;max-width:1240px;margin:0 auto;padding:14px 12p
 .switch input:checked+.track{background:linear-gradient(135deg,var(--brand),var(--eosin))}
 .switch input:checked+.track::after{transform:translateX(16px)}
 .switch input:focus-visible+.track{outline:2px solid var(--brand);outline-offset:2px}
+.switch input:disabled+.track{opacity:.4}
 .switch .sl{font:600 11.5px 'Inter';color:var(--ink2)}
 input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:26px;background:transparent;--pct:50%;cursor:pointer}
 input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:99px;background:linear-gradient(90deg,var(--brand),var(--eosin)) no-repeat 0/var(--pct) 100%,var(--line)}
@@ -204,9 +250,10 @@ input[type=range]:disabled{opacity:.4}
 .stat .ring .rfg{stroke:url(#ringGrad);fill:none;stroke-width:5;stroke-linecap:round;stroke-dasharray:106.8;transition:stroke-dashoffset .7s cubic-bezier(.2,.7,.3,1)}
 .stat small{font:600 10px 'Inter';color:var(--ink3);display:block}
 .hometools{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
-.seuilchip{cursor:pointer}
-.seuilchip:hover{border-color:var(--brand)}
+.seuilchip,.fxchip{cursor:pointer}
+.seuilchip:hover,.fxchip:hover{border-color:var(--brand)}
 .seuilchip.mod{box-shadow:inset 0 0 0 1px var(--warn)}
+.fxchip.lite{background:var(--info-bg);border-color:var(--info);color:var(--info-ink)}
 .banner{display:flex;align-items:center;gap:11px;padding:11px 13px;border-radius:14px;border:1px solid transparent;background:linear-gradient(var(--surface),var(--surface)) padding-box,linear-gradient(120deg,var(--brand),var(--eosin),var(--warn)) border-box}
 .banner .bic{width:34px;height:34px;flex:none;border-radius:10px;display:grid;place-items:center;background:var(--eosin-soft);color:var(--eosin)}
 .banner .bt{flex:1;min-width:0}
@@ -252,8 +299,9 @@ button.mlabel:hover .sn{color:var(--brand2)}
 .mtile.st-none{border-style:dashed;background:transparent;color:var(--ink3)}
 .mtile:hover{transform:translateY(-1px) scale(1.06);border-color:var(--brand);z-index:2}
 .mtile:active{transform:scale(.9)}
-.mtile.dim{opacity:.16;filter:saturate(.3)}
-.mhint{position:absolute;right:10px;bottom:8px;z-index:4;font:600 10px 'Inter';color:var(--ink3);background:var(--glass);border:1px solid var(--line);border-radius:99px;padding:3px 9px;pointer-events:none;transition:opacity .4s;backdrop-filter:blur(6px)}
+.mtile.dim{opacity:.16}
+.mhint{position:absolute;right:10px;bottom:8px;z-index:4;font:600 10px 'Inter';color:var(--ink3);background:var(--glass-solid);border:1px solid var(--line);border-radius:99px;padding:3px 9px;pointer-events:none;transition:opacity .4s}
+html[data-glass="1"] .mhint{background:var(--glass);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 .mhint.hide{opacity:0}
 .matrix::after{content:"";position:absolute;top:44px;right:0;bottom:0;width:26px;background:linear-gradient(to left,var(--surface),transparent);pointer-events:none;z-index:2}
 .mrow.dragging{position:relative;z-index:6;opacity:.95}
@@ -317,9 +365,11 @@ button.mlabel:hover .sn{color:var(--brand2)}
 .rlabel{position:sticky;left:0;z-index:3;background:var(--surface);display:flex;align-items:center;gap:7px;padding:6px 8px 6px 2px;text-align:left;border-radius:8px 0 0 8px;box-shadow:10px 0 12px -10px rgba(0,0,0,.4);min-width:0}
 .rlabel:hover{background:var(--surface2)}
 .rlabel:hover .rn{color:var(--brand2)}
+html[data-fx="lite"] .mlabel,html[data-fx="lite"] .rlabel,html[data-fx="lite"] .thead .tl{box-shadow:none;border-right:1px solid var(--line)}
 .rdot{width:8px;height:8px;border-radius:99px;flex:none;border:1.5px solid var(--line)}
 .rdot.st-ok{background:var(--ok);border-color:var(--ok)}
-.rdot.st-redo{background:var(--bad);border-color:var(--bad);box-shadow:0 0 7px var(--bad-line)}
+.rdot.st-redo{background:var(--bad);border-color:var(--bad)}
+html[data-glass="1"] .rdot.st-redo{box-shadow:0 0 7px var(--bad-line)}
 .rn{font:600 12.5px 'Inter';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
 .rn .hcode{font:700 10px 'Space Grotesk';margin-right:4px;color:var(--hue)}
 .tries{font:600 9.5px 'Space Grotesk';color:var(--ink3);flex:none}
@@ -328,17 +378,19 @@ button.mlabel:hover .sn{color:var(--brand2)}
 .cell.st-ok{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok-ink)}
 .cell.st-redo{background:var(--bad-bg);border-color:var(--bad-line);color:var(--bad-ink);background-image:repeating-linear-gradient(135deg,transparent 0 5px,var(--bad-stripe) 5px 8px)}
 .cell.st-none{border-style:dashed;background:transparent;color:var(--ink3)}
-.cell:hover{transform:translateY(-1px);border-color:var(--brand);box-shadow:0 3px 12px var(--brand-soft);z-index:1}
+.cell:hover{transform:translateY(-1px);border-color:var(--brand);z-index:1}
+html[data-glass="1"] .cell:hover{box-shadow:0 3px 12px var(--brand-soft)}
 .cell:active{transform:scale(.9)}
 .cell.pop{animation:pop .32s cubic-bezier(.2,.7,.3,1)}
 @keyframes pop{40%{transform:scale(1.16)}}
 .cell.editing{outline:2px solid var(--eosin);outline-offset:2px;z-index:2}
 .trow.flash .cell{animation:rowflash 1.3s ease}
-@keyframes rowflash{0%,60%{box-shadow:0 0 0 2px var(--brand),0 0 18px var(--brand-soft)}100%{box-shadow:none}}
+@keyframes rowflash{0%,60%{box-shadow:0 0 0 2px var(--brand)}100%{box-shadow:none}}
 .tempty{padding:26px 14px;text-align:center;color:var(--ink3);font-size:12.5px;display:flex;flex-direction:column;gap:10px;align-items:center}
 .tcard::after{content:"";position:absolute;top:0;right:0;bottom:0;width:22px;background:linear-gradient(to left,var(--surface),transparent);pointer-events:none}
 @media(max-width:479px){.thead,.trow{gap:3px}}
-.scrim{position:fixed;inset:0;z-index:70;background:rgba(9,6,24,.58);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:opacity .25s}
+.scrim{position:fixed;inset:0;z-index:70;background:rgba(9,6,24,.62);opacity:0;pointer-events:none;transition:opacity .25s}
+html[data-glass="1"] .scrim{background:rgba(9,6,24,.55);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
 .scrim.on{opacity:1;pointer-events:auto}
 .sheet{position:fixed;left:0;right:0;bottom:0;z-index:71;display:flex;flex-direction:column;max-height:90vh;max-height:90dvh;background:var(--surface);border:1px solid var(--line);border-bottom:0;border-radius:22px 22px 0 0;transform:translateY(105%);transition:transform .34s cubic-bezier(.32,.72,.24,1);box-shadow:var(--shadow);padding-bottom:env(safe-area-inset-bottom)}
 .sheet.open{transform:none}
@@ -426,6 +478,8 @@ button.mlabel:hover .sn{color:var(--brand2)}
 .storage-line{font-size:11px;color:var(--ink3);padding:8px 0 2px;display:flex;align-items:center;gap:6px}
 .storage-line .dot{background:var(--ok)}
 .storage-line.warn .dot{background:var(--warn)}
+.fx-diag{background:var(--surface2);border:1px solid var(--line);border-radius:12px;padding:10px;font-size:11px;color:var(--ink2);display:grid;gap:4px;margin:9px 0}
+.fx-diag b{color:var(--ink);font-weight:600}
 .kbd-list{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;padding:9px 0;font-size:11px;color:var(--ink2)}
 .kbd-list div{display:flex;align-items:center;gap:7px}
 @media(pointer:coarse){.kbd-sec{display:none}}
@@ -510,8 +564,9 @@ html.theming, html.theming *{transition:background-color .3s,color .3s,border-co
 .sy-help ol{margin:0;padding:10px 12px 12px 30px;font-size:11.5px;color:var(--ink2);display:grid;gap:4px}
 .sy-status{display:flex;align-items:center;gap:11px;background:var(--surface2);border:1px solid var(--line);border-radius:13px;padding:12px;margin-bottom:12px}
 .sy-status .sd{width:11px;height:11px;border-radius:99px;flex:none;background:var(--ink3)}
-.sy-status.ready .sd{background:var(--ok);box-shadow:0 0 10px var(--ok-line)}
-.sy-status.syncing .sd{background:var(--info);animation:blink 1s infinite}
+.sy-status.ready .sd{background:var(--ok)}
+.sy-status.syncing .sd{background:var(--info)}
+html[data-anim="1"] .sy-status.syncing .sd{animation:blink 1s infinite}
 .sy-status.locked .sd{background:var(--warn)}
 .sy-status.error .sd{background:var(--bad)}
 .sy-status.offline .sd{background:var(--warn)}
@@ -583,7 +638,6 @@ html.theming, html.theming *{transition:background-color .3s,color .3s,border-co
 .prg-row .prg-name{flex:1;min-width:0}
 .prg-row .prg-name b{font:600 13px 'Inter';display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .prg-row .prg-name span{font:400 10.5px 'Inter';color:var(--ink3)}
-.prg-row .hue-dot{width:10px;height:10px;border-radius:3px;flex:none;background:var(--hue,var(--brand))}
 .prg-edit{border:1px solid var(--brand);border-radius:12px;background:var(--brand-soft);padding:10px;margin-bottom:7px;display:flex;flex-direction:column;gap:8px;animation:popIn .18s}
 .prg-edit .r{display:flex;gap:8px;flex-wrap:wrap}
 .prg-edit .r>*{flex:1;min-width:110px}
@@ -655,6 +709,7 @@ noscript{display:block;padding:100px 20px;text-align:center;font-size:15px}
   <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.5 3 8 7 10 4-2 7-5.5 7-10V6Z"/><path d="m9 12 2 2 4-4"/></symbol>
   <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-gauge" viewBox="0 0 24 24"><path d="M4 18a9 9 0 1 1 16 0"/><path d="m12 14 4-4"/><circle cx="12" cy="15" r="1.6"/></symbol>
 </defs>
 </svg>
 
@@ -691,10 +746,10 @@ noscript{display:block;padding:100px 20px;text-align:center;font-size:15px}
   <span class="fl"><svg class="ic" style="width:12px;height:12px"><use href="#i-check-c"/></svg><span id="saveState">Données locales</span></span>
   <button data-action="prg-open">Programme</button>
   <button data-action="print-open">Imprimer</button>
+  <button data-action="fx-open">Rendu</button>
   <button data-action="export-json">Exporter</button>
-  <button data-action="import">Importer</button>
   <button data-action="settings">Réglages</button>
-  <span>Réviz'Med v1.2.2</span>
+  <span>Réviz'Med v1.3</span>
 </footer>
 
 <div class="scrim" id="scrim" data-action="scrim"></div>
@@ -763,6 +818,21 @@ noscript{display:block;padding:100px 20px;text-align:center;font-size:15px}
       <span class="selectwrap"><select id="setMax" aria-label="Note maximale"><option value="10">/ 10</option><option value="20" selected>/ 20</option><option value="100">/ 100</option></select><svg class="ic"><use href="#i-chev-d"/></svg></span>
     </div>
 
+    <div class="ssection" id="fxSection"><svg class="ic"><use href="#i-gauge"/></svg>Rendu &amp; stabilité</div>
+    <div class="srow col" style="border:0">
+      <div><div class="slabel">Profil de rendu</div><div class="sdesc">Le mode léger supprime les flous d'arrière-plan, le grain et les animations de fond — ces effets peuvent bloquer le GPU de certaines tablettes.</div></div>
+      <div class="seg" role="radiogroup" aria-label="Profil de rendu">
+        <button data-action="fx-set" data-v="auto">Auto</button>
+        <button data-action="fx-set" data-v="lite">Léger</button>
+        <button data-action="fx-set" data-v="full">Complet</button>
+      </div>
+    </div>
+    <div class="fx-diag" id="fxDiag"></div>
+    <div class="srow"><div><div class="slabel">Animations d'arrière-plan</div></div><label class="switch"><input type="checkbox" id="setAnim" checked><span class="track"></span></label></div>
+    <div class="srow"><div><div class="slabel">Verre dépoli (flou)</div><div class="sdesc">Le plus coûteux sur GPU mobile.</div></div><label class="switch"><input type="checkbox" id="setGlass" checked><span class="track"></span></label></div>
+    <div class="srow"><div><div class="slabel">Grain de texture</div></div><label class="switch"><input type="checkbox" id="setGrain" checked><span class="track"></span></label></div>
+    <div class="srow"><div><div class="slabel">Journal d'instabilité</div><div class="sdesc" id="fxLogDesc">Aucun arrêt brutal détecté.</div></div><button class="btn sm" data-action="fx-reset-log">Réinitialiser</button></div>
+
     <div class="ssection"><svg class="ic"><use href="#i-layers"/></svg>Programme</div>
     <div class="srow">
       <div><div class="slabel">Matières &amp; devoirs</div><div class="sdesc">Renommer, ajouter, supprimer matières, annales, contrôles, EBC, Q supp.</div></div>
@@ -826,7 +896,7 @@ noscript{display:block;padding:100px 20px;text-align:center;font-size:15px}
         <div><kbd>Échap</kbd> Fermer</div><div><kbd>Ctrl</kbd>+<kbd>P</kbd> Imprimer</div>
       </div>
     </div>
-    <div class="about">Réviz'Med v1.2.2 — conçu pour réviser sereinement en PASS / L.AS 🩺<br>Notes locales + coffre GitHub chiffré : personne d'autre ne peut les lire.</div>
+    <div class="about">Réviz'Med v1.3 — conçu pour réviser sereinement en PASS / L.AS 🩺<br>Notes locales + coffre GitHub chiffré : personne d'autre ne peut les lire.</div>
   </div>
 </div>
 
@@ -868,14 +938,15 @@ noscript{display:block;padding:100px 20px;text-align:center;font-size:15px}
 
 <div class="popover" id="pop" hidden></div>
 <div id="toasts" role="status" aria-live="polite"></div>
-<div id="fx" aria-hidden="true"></div>
+<div id="fxLayer" aria-hidden="true"></div>
 <input type="file" id="fileImport" accept=".json,application/json" hidden>
 <div id="printRoot"></div>
 <noscript>Réviz'Med a besoin de JavaScript pour fonctionner. Activez-le puis rechargez la page.</noscript>
 
 <script>
 'use strict';
-const APPV='1.2.2', LSK='revizmed:v1', SYNC_KEY='revizmed:sync', VAULT_FILE='revizmed-vault.json', N=10;
+const APPV='1.3.0', LSK='revizmed:v1', SYNC_KEY='revizmed:sync', VAULT_FILE='revizmed-vault.json', N=10;
+const BOOT_KEY='revizmed:boot', ABRUPT_KEY='revizmed:abrupt';
 const HUES=['ann','ctrl','ebc','qs','info','warn','tc','opt'];
 const HUE_NAMES={ann:'Violet',ctrl:'Bleu',ebc:'Ambre',qs:'Magenta',info:'Cyan',warn:'Orange',tc:'Vert',opt:'Rouge'};
 const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -892,6 +963,46 @@ const mqListen=(mq,fn)=>{if(mq.addEventListener)mq.addEventListener('change',fn)
 const uuid=()=> (crypto.randomUUID?crypto.randomUUID():'d-'+Date.now()+'-'+Math.random().toString(36).slice(2));
 const genId=p=>p+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7);
 const EMPTY=Object.freeze(Array(N).fill(null));
+
+/* ---------------- Profil de rendu & garde-fou anti-arrêt brutal ---------------- */
+const FX={boot:window.__fxBoot||{risky:false,tablet:false,standalone:false,mem:8,abrupt:0,lite:false,minSide:0},lite:false};
+function fxProfile(){
+  const s=state.settings;
+  const mode=s.render||'auto';
+  const lite=(mode==='lite')||(mode!=='full'&&FX.boot.risky)||FX.boot.abrupt>=2;
+  return{lite,anim:!!s.bgAnim&&!lite,glass:!!s.glass&&!lite,grain:!!s.grain&&!lite};
+}
+function applyFx(){
+  const p=fxProfile();FX.lite=p.lite;
+  const D=document.documentElement;
+  D.dataset.fx=p.lite?'lite':'full';
+  D.dataset.anim=p.anim?'1':'0';
+  D.dataset.glass=p.glass?'1':'0';
+  D.dataset.grain=p.grain?'1':'0';
+  syncFxUI();
+}
+function fxLabel(){return FX.lite?'Rendu : léger':'Rendu : complet';}
+function syncFxUI(){
+  const s=state.settings,p=fxProfile();
+  $$('[data-action="fx-set"]').forEach(b=>b.classList.toggle('on',(s.render||'auto')===b.dataset.v));
+  const chip=$('#homeFxChip');
+  if(chip){chip.classList.toggle('lite',p.lite);$('.fxlabel',chip).textContent=fxLabel();}
+  const a=$('#setAnim'),g=$('#setGlass'),n=$('#setGrain');
+  if(a){a.checked=!!s.bgAnim;a.disabled=p.lite;}
+  if(g){g.checked=!!s.glass;g.disabled=p.lite;}
+  if(n){n.checked=!!s.grain;n.disabled=p.lite;}
+  const d=$('#fxDiag');
+  if(d){
+    const b=FX.boot;
+    d.innerHTML='<span>Appareil : <b>'+(b.tablet?'tablette tactile':'mobile / ordinateur')+'</b> · mémoire annoncée <b>'+b.mem+' Go</b></span>'
+      +'<span>Mode : <b>'+(b.standalone?'application installée':'onglet navigateur')+'</b> · profil actif <b>'+(p.lite?'léger':'complet')+'</b></span>'
+      +'<span>'+((b.risky||p.lite)?'Rendu allégé appliqué pour la stabilité du GPU.':'Effets complets disponibles sur cet appareil.')+'</span>';
+  }
+  const ld=$('#fxLogDesc');
+  if(ld)ld.textContent=FX.boot.abrupt?(FX.boot.abrupt+' arrêt(s) brutal(aux) détecté(s) — mode léger '+(FX.boot.abrupt>=2?'forcé':'conseillé')+'.'):'Aucun arrêt brutal détecté.';
+}
+function markStable(){try{localStorage.setItem(BOOT_KEY,'0');}catch(e){}}
+function resetAbrupt(){FX.boot.abrupt=0;try{localStorage.setItem(ABRUPT_KEY,'0');}catch(e){}}
 
 /* ---------------- Structure du programme ---------------- */
 function defaultSubjects(){return[
@@ -936,11 +1047,13 @@ function codeOf(d){
 
 /* ---------------- État local ---------------- */
 function defaultMeta(){return{del:{sub:{},typ:{},itm:{}},resetAt:0,ovAt:0,subReset:{}};}
-function defaultState(){return{version:1,settings:{seuil:10,max:20,theme:'auto',sound:true,autoNext:true,demo:false},overrides:{},grades:{},activity:[],subjects:defaultSubjects(),types:defaultTypes(),meta:defaultMeta(),ui:{view:'home',filter:'all',sort:'prog',order:{tc:defaultSubjects().filter(s=>s.cat==='tc').map(s=>s.id),opt:defaultSubjects().filter(s=>s.cat==='opt').map(s=>s.id)},installDismissed:false,tipDismissed:false},updatedAt:Date.now()};}
+function defaultState(){return{version:1,settings:{seuil:10,max:20,theme:'auto',sound:true,autoNext:true,demo:false,render:'auto',bgAnim:true,glass:true,grain:true},overrides:{},grades:{},activity:[],subjects:defaultSubjects(),types:defaultTypes(),meta:defaultMeta(),ui:{view:'home',filter:'all',sort:'prog',order:{tc:defaultSubjects().filter(s=>s.cat==='tc').map(s=>s.id),opt:defaultSubjects().filter(s=>s.cat==='opt').map(s=>s.id)},installDismissed:false,tipDismissed:false,fxBannerDismissed:false},updatedAt:Date.now()};}
 function normalize(st){
   const d=defaultState();
   st.settings=Object.assign(d.settings,st.settings||{});
   st.ui=Object.assign(d.ui,st.ui||{});
+  if(!['auto','lite','full'].includes(st.settings.render))st.settings.render='auto';
+  ['bgAnim','glass','grain'].forEach(k=>{st.settings[k]=st.settings[k]!==false;});
   st.subjects=Array.isArray(st.subjects)&&st.subjects.length?st.subjects:d.subjects;
   st.types=Array.isArray(st.types)&&st.types.length?st.types:d.types;
   st.meta=st.meta&&typeof st.meta==='object'?st.meta:defaultMeta();
@@ -1084,8 +1197,6 @@ function undo(){
   state.grades=u.g;state.overrides=u.o;state.activity=u.a;state.ui.order=u.ord;
   state.subjects=u.subs;state.types=u.typs;state.meta=uMeta;
   if(crossesReset){
-    /* On annule un effacement : les notes restaurées doivent repasser
-       devant le marqueur d'effacement déjà propagé aux autres appareils. */
     const now=Date.now();
     Object.keys(state.grades).forEach(sid=>{
       const g=state.grades[sid];
@@ -1131,7 +1242,7 @@ function cellPaint(el,s,d,i){
 function paintCellByKey(s,d,i,pop){
   const el=$(cellSel(s,d,i));if(!el)return;
   cellPaint(el,s,d,i);
-  if(pop&&!RM){el.classList.remove('pop');void el.offsetWidth;el.classList.add('pop');}
+  if(pop&&!RM&&!FX.lite){el.classList.remove('pop');void el.offsetWidth;el.classList.add('pop');}
 }
 function paintTileByKey(s,d){
   const el=$(tileSel(s,d));if(!el)return;
@@ -1159,7 +1270,7 @@ function recolorAll(){
 /* ---------------- Statistiques ---------------- */
 function tween(el,to){
   if(!el)return;const from=el._v||0;el._v=to;
-  if(RM||from===to){el.textContent=to;return;}
+  if(RM||FX.lite||from===to){el.textContent=to;return;}
   if(el._raf)cancelAnimationFrame(el._raf);
   const t0=performance.now(),dur=380;
   const step=t=>{const p=Math.min(1,(t-t0)/dur),e=1-Math.pow(1-p,3);
@@ -1224,21 +1335,26 @@ function renderHome(){
   let h='';
   h+='<div class="pagehead'+rv(0)+'"><h1>Vue d\'ensemble</h1><p>'+DTOTAL+' devoirs par matière · 10 essais par devoir · vert = acquis, rouge = à refaire</p></div>';
   h+='<div class="banner'+rv(1)+'" id="demoBanner" hidden><div class="bic">'+icon('spark')+'</div><div class="bt"><b>Données de démonstration</b><span>Des notes fictives sont pré-remplies pour montrer les couleurs. Effacez-les pour partir de zéro.</span></div><div class="ba"><button class="btn sm" data-action="demo-keep">Garder</button><button class="btn sm primary" data-action="demo-clear">Effacer la démo</button></div></div>';
-  h+='<div class="banner'+rv(2)+'" id="syncBanner" hidden><div class="bic">'+icon('lock')+'</div><div class="bt"><b id="syncBannerTitle">Coffre verrouillé</b><span id="syncBannerBody">Déverrouillez pour retrouver vos notes sur cet appareil.</span></div><div class="ba"><button class="btn sm primary" data-action="sync-open">Ouvrir</button></div></div>';
-  h+='<div class="banner'+rv(3)+'" id="installBanner" hidden><div class="bic">'+icon('download')+'</div><div class="bt"><b id="installTitle">Installer Réviz\'Med</b><span id="installBody">Accès rapide et hors-ligne sur cet appareil.</span></div><div class="ba"><button class="btn sm ghost" data-action="install-dismiss">Plus tard</button><button class="btn sm primary" data-action="install-go" id="installGoBtn">Installer</button></div></div>';
-  h+='<div class="stats'+rv(4)+'">'
+  h+='<div class="banner'+rv(2)+'" id="fxBanner" hidden><div class="bic">'+icon('gauge')+'</div><div class="bt"><b id="fxBannerTitle">Rendu allégé activé</b><span id="fxBannerBody">Les flous, le grain et les animations de fond sont coupés pour la stabilité de cet appareil.</span></div><div class="ba"><button class="btn sm ghost" data-action="fx-banner-dismiss">Masquer</button><button class="btn sm" data-action="fx-open">Options</button><button class="btn sm primary" data-action="fx-set" data-v="full">Rendu complet</button></div></div>';
+  h+='<div class="banner'+rv(3)+'" id="syncBanner" hidden><div class="bic">'+icon('lock')+'</div><div class="bt"><b id="syncBannerTitle">Coffre verrouillé</b><span id="syncBannerBody">Déverrouillez pour retrouver vos notes sur cet appareil.</span></div><div class="ba"><button class="btn sm primary" data-action="sync-open">Ouvrir</button></div></div>';
+  h+='<div class="banner'+rv(4)+'" id="installBanner" hidden><div class="bic">'+icon('download')+'</div><div class="bt"><b id="installTitle">Installer Réviz\'Med</b><span id="installBody">Accès rapide et hors-ligne sur cet appareil.</span></div><div class="ba"><button class="btn sm ghost" data-action="install-dismiss">Plus tard</button><button class="btn sm primary" data-action="install-go" id="installGoBtn">Installer</button></div></div>';
+  h+='<div class="stats'+rv(5)+'">'
     +'<div class="card stat"><div class="ring"><svg viewBox="0 0 44 44"><circle class="rbg" cx="22" cy="22" r="17"/><circle class="rfg" id="ringFg" cx="22" cy="22" r="17" stroke-dashoffset="106.8"/></svg></div><div><b id="stProgVal">0 %</b><span>Progression</span><small id="stProgSub"></small></div></div>'
     +'<div class="card stat"><div class="si ok">'+icon('check-c')+'</div><div><b id="stOk">0</b><span>Devoirs validés</span></div></div>'
     +'<div class="card stat"><div class="si redo">'+icon('redo')+'</div><div><b id="stRedo">0</b><span>À refaire</span></div></div>'
     +'<div class="card stat"><div class="si notes">'+icon('flask')+'</div><div><b id="stNotes">0</b><span>Notes saisies</span></div></div>'
     +'</div>';
-  h+='<div class="hometools'+rv(5)+'">'+filterSegHTML()+'<span style="flex:1"></span><button class="btn sm" data-action="prg-open">'+icon('layers','width:14px;height:14px')+'Programme</button><button class="btn sm" data-action="print-open">'+icon('print','width:14px;height:14px')+'Imprimer</button>'+seuilChipHTML(null,'homeSeuilChip')+'</div>';
+  h+='<div class="hometools'+rv(6)+'">'+filterSegHTML()+'<span style="flex:1"></span>'
+    +'<button class="chip fxchip" id="homeFxChip" data-action="fx-cycle" title="Changer le profil de rendu">'+icon('gauge','width:13px;height:13px')+'<span class="fxlabel">Rendu</span></button>'
+    +'<button class="btn sm" data-action="prg-open">'+icon('layers','width:14px;height:14px')+'Programme</button>'
+    +'<button class="btn sm" data-action="print-open">'+icon('print','width:14px;height:14px')+'Imprimer</button>'
+    +seuilChipHTML(null,'homeSeuilChip')+'</div>';
   h+='<div class="dash">';
-  h+='<div class="dash-main">'+matrixHTML('tc',6)+matrixHTML('opt',7)+'</div>';
+  h+='<div class="dash-main">'+matrixHTML('tc',7)+matrixHTML('opt',8)+'</div>';
   h+='<div class="dash-rail">';
-  h+='<div class="card'+rv(8)+'"><div class="card-h">'+icon('redo','color:var(--bad)')+'<h2>À refaire en priorité</h2><span class="chip st-redo" id="queueCount">0</span></div><div class="qlist" id="queueList"></div><div style="padding:0 14px 12px"><button class="btn sm full" id="btnQueueAll" data-action="queue-all" hidden></button></div></div>';
-  h+='<div class="card'+rv(9)+'"><div class="card-h">'+icon('clock','color:var(--info)')+'<h2>Activité récente</h2></div><div class="alist" id="activityList"></div></div>';
-  h+='<div class="card'+rv(10)+'"><div class="card-h">'+icon('info','color:var(--brand2)')+'<h2>Légende</h2></div><div class="legend">'
+  h+='<div class="card'+rv(9)+'"><div class="card-h">'+icon('redo','color:var(--bad)')+'<h2>À refaire en priorité</h2><span class="chip st-redo" id="queueCount">0</span></div><div class="qlist" id="queueList"></div><div style="padding:0 14px 12px"><button class="btn sm full" id="btnQueueAll" data-action="queue-all" hidden></button></div></div>';
+  h+='<div class="card'+rv(10)+'"><div class="card-h">'+icon('clock','color:var(--info)')+'<h2>Activité récente</h2></div><div class="alist" id="activityList"></div></div>';
+  h+='<div class="card'+rv(11)+'"><div class="card-h">'+icon('info','color:var(--brand2)')+'<h2>Légende</h2></div><div class="legend">'
     +'<div class="lrow"><span class="lcell st-ok">14</span>Note ≥ <b class="seuilEcho">10</b> → devoir acquis</div>'
     +'<div class="lrow"><span class="lcell st-redo">7</span>Note &lt; <b class="seuilEcho">10</b> → à refaire (hachures)</div>'
     +'<div class="lrow"><span class="lcell st-none"></span>Case vide → pas encore fait</div>'
@@ -1248,7 +1364,7 @@ function renderHome(){
   v.innerHTML=h;
   $$('.mscroll',v).forEach(el=>{if(scrolls[el.dataset.cat])el.scrollLeft=scrolls[el.dataset.cat];
     el.addEventListener('scroll',()=>{const hint=$('.mhint',el.parentElement);if(hint)hint.classList.add('hide');},{once:true,passive:true});});
-  renderQueue();renderActivity();updateBanners();syncFilterUI();refreshStats();syncSeuilUI();
+  renderQueue();renderActivity();updateBanners();syncFilterUI();refreshStats();syncSeuilUI();syncFxUI();
 }
 function filterSegHTML(){
   const f=state.ui.filter;
@@ -1390,7 +1506,7 @@ function renderSubject(sid){
     const d=pendingFlash;pendingFlash=null;
     requestAnimationFrame(()=>{
       const row=$('.trow[data-d="'+d+'"]',v);
-      if(row){row.scrollIntoView({block:'center',behavior:RM?'auto':'smooth'});row.classList.add('flash');
+      if(row){row.scrollIntoView({block:'center',behavior:(RM||FX.lite)?'auto':'smooth'});row.classList.add('flash');
         row.addEventListener('animationend',()=>row.classList.remove('flash'),{once:true});}
     });
   }
@@ -1437,7 +1553,7 @@ function route(){
   }else{
     vs.hidden=true;vh.hidden=false;
     vh.classList.remove('enter');void vh.offsetWidth;vh.classList.add('enter');
-    refreshStats();renderQueue();renderActivity();syncFilterUI();syncSeuilUI();
+    refreshStats();renderQueue();renderActivity();syncFilterUI();syncSeuilUI();syncFxUI();
     document.title='Réviz\'Med — Carnet de révisions PASS / L.AS';
   }
   const key=t.view==='subject'?'m:'+t.s:'home';
@@ -1459,7 +1575,7 @@ function refreshAll(){
   if(CUR.view==='subject'&&!SUBJ[CUR.s]){navTo('home');}
   renderNav();renderHome();
   if(CUR.view==='subject'&&SUBJ[CUR.s])renderSubject(CUR.s);
-  refreshStats();syncSeuilUI();syncFilterUI();updateBanners();syncDemoUI();
+  refreshStats();syncSeuilUI();syncFilterUI();updateBanners();syncDemoUI();syncFxUI();
   if(SHEETS.includes('sheetProgram'))prgRender();
 }
 
@@ -1656,7 +1772,7 @@ function edParseForCommit(){
 }
 function edShake(){
   const el=$('#edVal');
-  if(el&&!RM&&el.animate)el.animate([{transform:'translateX(0)'},{transform:'translateX(-7px)'},{transform:'translateX(7px)'},{transform:'translateX(-4px)'},{transform:'translateX(0)'}],{duration:240});
+  if(el&&!RM&&!FX.lite&&el.animate)el.animate([{transform:'translateX(0)'},{transform:'translateX(-7px)'},{transform:'translateX(7px)'},{transform:'translateX(-4px)'},{transform:'translateX(0)'}],{duration:240});
   play('error');
   const h=$('#edHint');if(h){h.classList.add('err');h.textContent='Note entre 0 et '+state.settings.max+' — format 12,5';}
 }
@@ -1835,7 +1951,7 @@ const mqDark=matchMedia('(prefers-color-scheme: dark)');
 function effectiveDark(){const t=state.settings.theme;return t==='dark'||(t==='auto'&&mqDark.matches);}
 function applyTheme(anim){
   const dark=effectiveDark();
-  if(anim&&!RM){document.documentElement.classList.add('theming');setTimeout(()=>document.documentElement.classList.remove('theming'),350);}
+  if(anim&&!RM&&!FX.lite){document.documentElement.classList.add('theming');setTimeout(()=>document.documentElement.classList.remove('theming'),350);}
   document.documentElement.dataset.theme=dark?'dark':'light';
   $('#metaTheme').content=dark?'#131022':'#f6f3ee';
   const b=$('#btnTheme');if(b){b.innerHTML=icon(dark?'sun':'moon');b.title=dark?'Passer en thème clair':'Passer en thème sombre';}
@@ -1844,8 +1960,8 @@ function applyTheme(anim){
 mqListen(mqDark,()=>{if(state.settings.theme==='auto')applyTheme(true);});
 const FXCOLS=['#8b6cff','#ff4d8d','#2fd57f','#4cc3ff','#ffb224','#ff6ad5'];
 function confetti(cx,cy,n){
-  if(RM)return;
-  const root=$('#fx');
+  if(RM||FX.lite)return;
+  const root=$('#fxLayer');
   for(let i=0;i<n;i++){
     const el=document.createElement('i');
     el.style.left=cx+'px';el.style.top=cy+'px';
@@ -1902,7 +2018,6 @@ function handleImportFile(file){
         const now=Date.now();
         state.subjects=inc.subjects;state.types=inc.types;state.meta=inc.meta;
         state.grades=inc.grades;state.overrides=inc.overrides;state.activity=inc.activity;state.ui.order=inc.ui.order;
-        /* L'import doit lui aussi passer devant les effacements déjà propagés. */
         Object.keys(state.grades).forEach(sid=>{const g=state.grades[sid];Object.keys(g).forEach(k=>{g[k]=g[k].map(c=>c?{v:c.v,t:now}:null);});});
         state.meta.ovAt=now;
         state.settings.demo=false;
@@ -1914,7 +2029,6 @@ function handleImportFile(file){
   rd.onerror=()=>toast('bad','Impossible de lire le fichier.');
   rd.readAsText(file);
 }
-/* Effacement global : marqueur horodaté propagé à tous les appareils. */
 function clearGrades(label,opts){
   opts=opts||{};
   pushUndo(label);
@@ -1933,6 +2047,18 @@ function syncDemoUI(){const b=$('#rowDemo');if(b)b.hidden=!state.settings.demo;}
 function updateBanners(){
   const db=$('#demoBanner');if(db)db.hidden=!state.settings.demo;
   syncDemoUI();
+  const fb=$('#fxBanner');
+  if(fb){
+    const auto=(state.settings.render||'auto')==='auto';
+    const show=FX.lite&&!state.ui.fxBannerDismissed&&(auto||FX.boot.abrupt>=2);
+    fb.hidden=!show;
+    if(show){
+      $('#fxBannerTitle').textContent=FX.boot.abrupt>=2?'Rendu léger forcé après un arrêt brutal':'Rendu allégé activé automatiquement';
+      $('#fxBannerBody').textContent=FX.boot.abrupt>=2
+        ?'L\'application a détecté '+FX.boot.abrupt+' arrêt(s) brutal(aux). Les effets GPU coûteux restent coupés pour éviter un nouveau redémarrage.'
+        :'Sur tablette, les flous d\'arrière-plan, le grain et les animations de fond sont coupés : ce sont eux qui peuvent bloquer le GPU.';
+    }
+  }
   const sb=$('#syncBanner');
   if(sb){
     const show=!!SY.cfg&&(SY.status==='locked'||SY.status==='error');
@@ -1986,8 +2112,27 @@ function searchGo(ix){
   if(it.d)goDevoir(it.s,it.d);else navTo('subject',it.s);
 }
 
+/* ---------------- Rendu : actions ---------------- */
+function setRender(mode){
+  state.settings.render=mode;
+  if(mode==='full')resetAbrupt();
+  state.ui.fxBannerDismissed=(mode!=='auto');
+  markDirty();applyFx();updateBanners();
+  if(CUR.view==='home')renderHome();else refreshStats();
+  toast('info',mode==='full'?'Rendu complet activé — si l\'appareil se bloque, le mode léger sera réappliqué automatiquement.':(mode==='lite'?'Rendu léger activé : effets GPU coûteux coupés.':'Profil automatique : léger sur tablette, complet ailleurs.'),{ms:5200});
+  play('tick');
+}
+function cycleRender(){
+  const cur=state.settings.render||'auto';
+  setRender(cur==='auto'?'lite':(cur==='lite'?'full':'auto'));
+}
+function openFxSettings(){
+  syncSettingsUI();openSheet('sheetSettings');
+  requestAnimationFrame(()=>{const s=$('#fxSection');if(s)s.scrollIntoView({block:'start',behavior:(RM||FX.lite)?'auto':'smooth'});});
+}
+
 /* ===================================================================
-   ÉDITEUR DE PROGRAMME — matières & devoirs
+   ÉDITEUR DE PROGRAMME
 =================================================================== */
 const PRG={tab:'sub',editSub:null,editTyp:null,editItm:null};
 function hueOptions(sel){return HUES.map(h=>'<option value="'+h+'"'+(h===sel?' selected':'')+'>'+HUE_NAMES[h]+'</option>').join('');}
@@ -2020,7 +2165,7 @@ function prgRender(){
       +'<div class="prg-add"><input class="prg-input" id="prgNewSubName" placeholder="Ex : Embryologie, Anglais…" maxlength="40">'
       +'<select id="prgNewSubCat"><option value="tc">Tronc commun</option><option value="opt">Options</option></select>'
       +'<button class="btn primary" data-action="prg-sub-add">'+icon('plus','width:14px;height:14px')+'Ajouter</button></div>'
-      +'<div class="prg-hint">La nouvelle matière hérite de tous les devoirs du programme (annales, contrôles, EBC, Q supp…). Réordonnez les matières en glissant la poignée ⠿ sur l\'accueil.</div></div>';
+      +'<div class="prg-hint">La nouvelle matière hérite de tous les devoirs du programme. Réordonnez les matières en glissant la poignée ⠿ sur l\'accueil.</div></div>';
   }else{
     TYPES.forEach(t=>{
       const nn=notesOfType(t.id);
@@ -2050,7 +2195,7 @@ function prgRender(){
               +'<button class="iconbtn sm danger" data-action="prg-itm-del" data-t="'+t.id+'" data-i="'+it.id+'" title="Supprimer">'+icon('trash')+'</button></div>';
           }
         });
-        h+='<div class="prg-add"><input class="prg-input" id="prgNewItem-'+t.id+'" data-t="'+t.id+'" placeholder="Nouvel intitulé · ex : 2027, session 2, rattrapage…" maxlength="30">'
+        h+='<div class="prg-add"><input class="prg-input" id="prgNewItem-'+t.id+'" data-t="'+t.id+'" placeholder="Nouvel intitulé · ex : 2027, session 2…" maxlength="30">'
           +'<button class="btn sm" data-action="prg-itm-add" data-t="'+t.id+'">'+icon('plus','width:13px;height:13px')+'Ajouter</button></div>';
         h+='</div>';
       }
@@ -2284,7 +2429,6 @@ function mergePayload(a,b){
     const A=(am.del&&am.del[k])||{},B=(bm.del&&bm.del[k])||{};
     new Set([...Object.keys(A),...Object.keys(B)]).forEach(id=>{del[k][id]=Math.max(+A[id]||0,+B[id]||0);});
   });
-  /* Marqueurs d'effacement : ils gagnent toujours sur les notes plus anciennes. */
   const resetAt=Math.max(+am.resetAt||0,+bm.resetAt||0);
   const ovAt=Math.max(+am.ovAt||0,+bm.ovAt||0);
   const subReset={};
@@ -2730,8 +2874,7 @@ document.addEventListener('click',e=>{
     case'export-subj':closePop();exportCSV(s);break;
     case'reset-subj':closePop();openConfirm({title:'Réinitialiser '+SUBJ[s].name+' ?',body:'Toutes les notes de cette matière seront effacées, sur cet appareil et sur vos appareils synchronisés. Annulable juste après.',label:'Réinitialiser',danger:true,cb:()=>{
       pushUndo('Réinitialisation '+SUBJ[s].name);
-      const now=Date.now();
-      state.meta.subReset[s]=now;
+      state.meta.subReset[s]=Date.now();
       delete state.grades[s];
       state.activity=state.activity.filter(x=>x.s!==s);
       markDirty();closeAllSheets();refreshAll();
@@ -2782,6 +2925,11 @@ document.addEventListener('click',e=>{
     case'tip-dismiss':state.ui.tipDismissed=true;markDirty();t.closest('.coach').remove();break;
     case'print-open':openPrint();break;
     case'print-go':doPrint();break;
+    case'fx-open':openFxSettings();break;
+    case'fx-cycle':cycleRender();break;
+    case'fx-set':setRender(t.dataset.v);break;
+    case'fx-banner-dismiss':state.ui.fxBannerDismissed=true;markDirty();updateBanners();break;
+    case'fx-reset-log':resetAbrupt();applyFx();updateBanners();toast('ok','Journal d\'instabilité réinitialisé ✓');break;
     case'sync-open':syncRenderSheet();openSheet('sheetSync');break;
     case'sy-mode':SY.mode=t.dataset.v;syncRenderSheet();break;
     case'sy-connect':syncConnect();break;
@@ -2845,6 +2993,9 @@ document.addEventListener('change',e=>{
   }
   else if(el.id==='setSound'){state.settings.sound=el.checked;markDirty();syncSoundUI();if(el.checked)play('tick');}
   else if(el.id==='setAuto'||el.id==='edAuto'){state.settings.autoNext=el.checked;markDirty();const o=el.id==='edAuto'?$('#setAuto'):$('#edAuto');if(o)o.checked=el.checked;}
+  else if(el.id==='setAnim'){state.settings.bgAnim=el.checked;markDirty();applyFx();}
+  else if(el.id==='setGlass'){state.settings.glass=el.checked;markDirty();applyFx();}
+  else if(el.id==='setGrain'){state.settings.grain=el.checked;markDirty();applyFx();}
   else if(el.id==='syAuto'&&SY.cfg){SY.cfg.auto=el.checked;syncSaveCfg();if(el.checked)syncSchedule();}
   else if(el.id==='ovInherit'&&POP&&POP.sid){
     if(!POP.undoPushed){pushUndo('Seuil matière');POP.undoPushed=true;}
@@ -2987,17 +3138,17 @@ window.addEventListener('scroll',()=>{if(POP)closePop();},{capture:true,passive:
 window.addEventListener('resize',()=>{if(POP)closePop();},{passive:true});
 window.addEventListener('hashchange',route);
 document.addEventListener('visibilitychange',()=>{
-  if(document.visibilityState==='hidden'&&saveTimer)flushSave();
+  if(document.visibilityState==='hidden'){if(saveTimer)flushSave();markStable();}
   if(document.visibilityState==='visible'&&SY.cfg&&SY.key&&SY.dirty)syncNow(false);
 });
-window.addEventListener('pagehide',()=>{if(saveTimer)flushSave();});
+window.addEventListener('pagehide',()=>{if(saveTimer)flushSave();markStable();});
 
 /* ---------------- Réglages sync ---------------- */
 function syncSettingsUI(){
   $('#setMax').value=String(state.settings.max);
   $('#setSound').checked=state.settings.sound;
   $('#setAuto').checked=state.settings.autoNext;
-  syncSeuilUI();syncSoundUI();applyTheme(false);syncDemoUI();syncStorageLine();updateBanners();
+  syncSeuilUI();syncSoundUI();applyTheme(false);syncDemoUI();syncStorageLine();updateBanners();syncFxUI();
 }
 
 /* ---------------- PWA ---------------- */
@@ -3024,6 +3175,9 @@ function drawIcon(size){
   return c.toDataURL('image/png');
 }
 function buildRuntimeManifest(){
+  /* Inutile en mode installé : le WebAPK a déjà ses icônes. On évite ainsi
+     tout travail canvas et toute réécriture du manifeste à chaque lancement. */
+  if(FX.boot.standalone)return;
   try{
     const base=new URL('./',location.href).href;
     const p192=drawIcon(192),p512=drawIcon(512),p180=drawIcon(180);
@@ -3060,7 +3214,7 @@ function registerSW(){
         const nw=reg.installing;
         if(nw)nw.addEventListener('statechange',()=>{
           if(nw.state==='installed'&&navigator.serviceWorker.controller){
-            toast('info','Mise à jour disponible.',{label:'Recharger',cb:()=>location.reload(),ms:9000});
+            toast('info','Mise à jour disponible.',{label:'Recharger',cb:()=>{markStable();location.reload();},ms:9000});
           }
         });
       });
@@ -3078,9 +3232,9 @@ window.addEventListener('storage',e=>{
     const p=JSON.parse(e.newValue);
     if(!p||!p.grades)return;
     closeAllSheets();
-    const keepTheme=state.settings.theme;
-    state=normalize(p);state.settings.theme=keepTheme;
-    rebuildModel();refreshAll();
+    const keep={theme:state.settings.theme,render:state.settings.render,bgAnim:state.settings.bgAnim,glass:state.settings.glass,grain:state.settings.grain};
+    state=normalize(p);Object.assign(state.settings,keep);
+    rebuildModel();applyFx();refreshAll();
     if(!syncToastT){syncToastT=setTimeout(()=>syncToastT=null,4000);toast('info','Synchronisé depuis un autre onglet ✓',{ms:2500});}
   }catch(_){}
 });
@@ -3088,6 +3242,7 @@ window.addEventListener('storage',e=>{
 /* ---------------- Init ---------------- */
 load();
 rebuildModel();
+applyFx();
 if(!location.hash&&state.ui.view&&state.ui.view!=='home'&&SUBJ[state.ui.view]){
   try{history.replaceState(null,'','#/m/'+state.ui.view);}catch(e){location.hash='#/m/'+state.ui.view;}
 }
@@ -3095,11 +3250,15 @@ renderNav();
 renderHome();
 route();
 firstRender=false;
-applyTheme(false);syncSoundUI();syncSeuilUI();updateUndoBtn();updateBanners();netBadge();syncStorageLine();
+applyTheme(false);syncSoundUI();syncSeuilUI();updateUndoBtn();updateBanners();netBadge();syncStorageLine();syncFxUI();
 buildRuntimeManifest();
 registerSW();
 syncInit();
 try{localStorage.setItem(LSK,JSON.stringify(state));}catch(e){storageOK=false;syncStorageLine();}
+/* Le lancement est déclaré stable après 8 s : un redémarrage avant ce délai
+   sera détecté au prochain démarrage et forcera le rendu léger. */
+setTimeout(markStable,8000);
+if(FX.boot.abrupt>=2)setTimeout(()=>toast('warn','Arrêt brutal détecté au lancement précédent : rendu léger maintenu pour la stabilité.',{ms:8000,label:'Options',cb:openFxSettings}),900);
 </script>
 </body>
 </html>
