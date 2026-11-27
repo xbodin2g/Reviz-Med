@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Réviz'Med — Console de secours &amp; diagnostic</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#131022">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#131022;--bg2:#181430;--surface:#1e1936;--surface2:#262045;
+  --line:#332b56;--line2:#4a3f7d;
+  --ink:#efecfb;--ink2:#b4abd8;--ink3:#8078ab;
+  --brand:#8b6cff;--brand2:#b7a4ff;--eosin:#ff4d8d;
+  --ok:#2fd57f;--ok-ink:#71f0ad;--ok-bg:rgba(47,213,127,.13);--ok-line:rgba(47,213,127,.5);
+  --bad:#ff4d67;--bad-ink:#ff9fae;--bad-bg:rgba(255,77,103,.14);--bad-line:rgba(255,77,103,.55);
+  --warn:#ffb224;--warn-ink:#ffcf7a;--warn-bg:rgba(255,178,36,.13);--warn-line:rgba(255,178,36,.5);
+  --info:#4cc3ff;--info-ink:#9adcff;--info-bg:rgba(76,195,255,.13);--info-line:rgba(76,195,255,.5);
+  --brand-soft:rgba(139,108,255,.16);--eosin-soft:rgba(255,77,141,.14);
+  --shadow:0 14px 40px rgba(8,5,26,.5);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scrollbar-color:var(--brand) transparent;scrollbar-width:thin}
+body{font:400 15px/1.55 'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;min-height:100vh}
+h1,h2,h3,.sg{font-family:'Space Grotesk','Inter',system-ui,sans-serif}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;touch-action:manipulation}
+a{color:var(--brand2)}
+code{font:600 12px ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface2);border:1px solid var(--line);border-radius:5px;padding:1px 6px;word-break:break-all}
+::selection{background:var(--brand-soft)}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:6px}
+*::-webkit-scrollbar{width:10px;height:8px}
+*::-webkit-scrollbar-track{background:var(--bg2)}
+*::-webkit-scrollbar-thumb{background:linear-gradient(180deg,var(--brand),var(--eosin));border-radius:99px;border:2px solid var(--bg)}
+*::-webkit-scrollbar-thumb:hover{background:linear-gradient(180deg,var(--brand2),var(--eosin))}
+.bg{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.bg i{position:absolute;border-radius:50%;display:block}
+.bg .g1{width:60vmax;height:60vmax;left:-24vmax;top:-26vmax;background:radial-gradient(circle at 35% 35%,var(--brand-soft),transparent 62%)}
+.bg .g2{width:50vmax;height:50vmax;right:-22vmax;top:-10vmax;background:radial-gradient(circle at 60% 40%,var(--eosin-soft),transparent 60%)}
+.wrap{position:relative;z-index:1;max-width:940px;margin:0 auto;padding:22px 14px 60px}
+header.top{display:flex;align-items:center;gap:13px;flex-wrap:wrap;margin-bottom:6px}
+.mark{width:44px;height:44px;flex:none;border-radius:13px;background:linear-gradient(135deg,var(--brand),var(--eosin));display:grid;place-items:center}
+.mark svg{width:26px;height:26px}
+header.top h1{font-size:22px;font-weight:700;line-height:1.15;flex:1;min-width:200px}
+header.top p{font-size:12px;color:var(--ink3);display:block;font-family:'Inter';font-weight:500;margin-top:2px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);margin-top:14px;overflow:hidden}
+.card-h{display:flex;align-items:center;gap:10px;padding:13px 15px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.card-h h2{font-size:15px;font-weight:700;flex:1;min-width:0}
+.card-h .num{width:24px;height:24px;flex:none;border-radius:8px;background:var(--brand-soft);color:var(--brand2);font:700 12px 'Space Grotesk';display:grid;place-items:center}
+.card-b{padding:14px 15px}
+.lead{font-size:13px;color:var(--ink2);margin-bottom:12px}
+.lead b{color:var(--ink);font-weight:600}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:99px;border:1px solid var(--line);background:var(--surface2);font:600 11px 'Inter';color:var(--ink2)}
+.pill.ok{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok-ink)}
+.pill.bad{background:var(--bad-bg);border-color:var(--bad-line);color:var(--bad-ink)}
+.pill.warn{background:var(--warn-bg);border-color:var(--warn-line);color:var(--warn-ink)}
+.pill.info{background:var(--info-bg);border-color:var(--info-line);color:var(--info-ink)}
+.pill .d{width:7px;height:7px;border-radius:99px;background:currentColor;flex:none}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:38px;padding:0 15px;border-radius:11px;border:1px solid var(--line);background:var(--surface2);font:600 12.5px 'Inter';color:var(--ink);transition:border-color .15s,transform .12s,filter .15s}
+.btn:hover{border-color:var(--brand)}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:linear-gradient(135deg,var(--brand),var(--eosin));border-color:transparent;color:#fff}
+.btn.primary:hover{filter:brightness(1.09)}
+.btn.ok{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok-ink)}
+.btn.danger{background:var(--bad-bg);border-color:var(--bad-line);color:var(--bad-ink)}
+.btn.big{height:46px;font-size:14px;padding:0 20px}
+.btn.full{width:100%}
+.btn[disabled]{opacity:.45;pointer-events:none}
+.btn svg{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.row{display:flex;gap:9px;flex-wrap:wrap}
+.grid{display:grid;gap:9px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+.fact{background:var(--surface2);border:1px solid var(--line);border-radius:11px;padding:10px 11px;min-width:0}
+.fact b{font:700 17px 'Space Grotesk';display:block;line-height:1.15;word-break:break-word}
+.fact span{font:600 9.5px 'Inter';text-transform:uppercase;letter-spacing:1px;color:var(--ink3);display:block;margin-top:3px}
+.fact.ok b{color:var(--ok-ink)}.fact.bad b{color:var(--bad-ink)}.fact.warn b{color:var(--warn-ink)}.fact.info b{color:var(--info-ink)}
+.field{display:flex;flex-direction:column;gap:5px;margin:10px 0}
+.field label{font:600 12px 'Inter'}
+.field .hint{font-size:10.5px;color:var(--ink3)}
+input[type=text],input[type=password]{height:42px;border-radius:11px;border:1px solid var(--line);background:var(--surface2);color:var(--ink);font:500 15px 'Inter';padding:0 12px;outline:none;width:100%}
+input:focus{border-color:var(--brand)}
+.note{font-size:11.5px;color:var(--ink3);margin-top:10px;line-height:1.55}
+.alert{display:flex;gap:11px;padding:12px;border-radius:12px;border:1px solid var(--warn-line);background:var(--warn-bg);margin-bottom:12px}
+.alert.bad{border-color:var(--bad-line);background:var(--bad-bg)}
+.alert.ok{border-color:var(--ok-line);background:var(--ok-bg)}
+.alert.info{border-color:var(--info-line);background:var(--info-bg)}
+.alert .ai{width:30px;height:30px;flex:none;border-radius:9px;display:grid;place-items:center;background:var(--surface);color:var(--warn-ink)}
+.alert.bad .ai{color:var(--bad-ink)}.alert.ok .ai{color:var(--ok-ink)}.alert.info .ai{color:var(--info-ink)}
+.alert .at{flex:1;min-width:0;font-size:12.5px;color:var(--ink2)}
+.alert .at b{display:block;color:var(--ink);font:700 13px 'Inter';margin-bottom:2px}
+.alert svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.steps{counter-reset:s;display:grid;gap:9px}
+.step{display:flex;gap:11px;background:var(--surface2);border:1px solid var(--line);border-radius:12px;padding:11px 12px}
+.step .sn{counter-increment:s;flex:none;width:26px;height:26px;border-radius:9px;background:var(--brand-soft);color:var(--brand2);font:700 12px 'Space Grotesk';display:grid;place-items:center}
+.step .sn::before{content:counter(s)}
+.step.key{border-color:var(--ok-line);background:var(--ok-bg)}
+.step.key .sn{background:var(--surface);color:var(--ok-ink)}
+.step.warn{border-color:var(--warn-line);background:var(--warn-bg)}
+.step.warn .sn{background:var(--surface);color:var(--warn-ink)}
+.step.danger{border-color:var(--bad-line);background:var(--bad-bg)}
+.step.danger .sn{background:var(--surface);color:var(--bad-ink)}
+.step .st{flex:1;min-width:0;font-size:12.5px;color:var(--ink2)}
+.step .st b{display:block;color:var(--ink);font:700 13px 'Inter';margin-bottom:3px}
+.step .st ul{margin:5px 0 0 16px;display:grid;gap:3px}
+pre.report{background:var(--bg2);border:1px solid var(--line);border-radius:11px;padding:11px;font:500 11px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink2);max-height:230px;overflow:auto;white-space:pre-wrap;word-break:break-word;margin-top:10px}
+.list{display:grid;gap:6px;margin-top:9px}
+.li{display:flex;align-items:center;gap:9px;background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:11.5px}
+.li .lt{flex:1;min-width:0;word-break:break-all;color:var(--ink2)}
+.li .lt b{color:var(--ink);font-weight:600}
+.check{display:flex;align-items:flex-start;gap:9px;padding:9px 0;border-bottom:1px solid var(--line);font-size:12.5px;cursor:pointer}
+.check:last-of-type{border-bottom:0}
+.check input{position:absolute;opacity:0;width:1px;height:1px}
+.check .box{width:20px;height:20px;flex:none;border-radius:6px;border:1px solid var(--line2);background:var(--surface2);display:grid;place-items:center;margin-top:1px;transition:.15s}
+.check .box svg{width:13px;height:13px;stroke:#fff;fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;opacity:0}
+.check input:checked+.box{background:linear-gradient(135deg,var(--brand),var(--eosin));border-color:transparent}
+.check input:checked+.box svg{opacity:1}
+.check input:focus-visible+.box{outline:2px solid var(--brand);outline-offset:2px}
+.check .ct{flex:1;min-width:0;color:var(--ink2)}
+.check .ct b{color:var(--ink);font-weight:600;display:block}
+#toasts{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom));z-index:50;display:flex;flex-direction:column;gap:8px;width:min(430px,calc(100vw - 20px));pointer-events:none}
+.toast{pointer-events:auto;display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line2);border-left:3px solid var(--brand);border-radius:12px;padding:11px 12px;box-shadow:var(--shadow);font-size:12.5px;animation:tin .26s cubic-bezier(.2,.7,.3,1)}
+.toast.ok{border-left-color:var(--ok)}.toast.bad{border-left-color:var(--bad)}.toast.warn{border-left-color:var(--warn)}.toast.info{border-left-color:var(--info)}
+.toast.out{animation:tout .22s forwards}
+@keyframes tin{from{opacity:0;transform:translateY(12px)}}
+@keyframes tout{to{opacity:0;transform:translateY(10px)}}
+.toast .tm{flex:1;min-width:0}
+footer{margin-top:22px;text-align:center;font-size:11px;color:var(--ink3);line-height:1.7}
+@media(max-width:520px){header.top h1{font-size:19px}.card-b{padding:12px}.btn.big{width:100%}}
+@media (prefers-reduced-motion: reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<div class="bg" aria-hidden="true"><i class="g1"></i><i class="g2"></i></div>
+
+<div class="wrap">
+<header class="top">
+  <div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 5 6v5c0 4.5 3 8 7 10 4-2 7-5.5 7-10V6Z"/><path d="m9 12 2 2 4-4"/></svg></div>
+  <h1>Console de secours<span style="display:block;font-size:12px;color:var(--ink3);font-family:'Inter';font-weight:500;margin-top:2px">Sauvegarder vos notes · vérifier le coffre · nettoyer cet appareil · diagnostiquer la tablette</span></h1>
+  <span class="pill info" id="originPill"><span class="d"></span><span id="originTxt">…</span></span>
+</header>
+
+<div class="alert info" style="margin-top:14px">
+  <div class="ai"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg></div>
+  <div class="at"><b>Cette page ne touche à rien sans votre accord</b>Elle lit le stockage de l'application, chiffre/déchiffre localement, et n'écrit sur le réseau que si vous lancez une vérification du coffre. Aucun système Android n'est accessible depuis une page web — voyez la section 6.</div>
+</div>
+
+<!-- 1. DONNÉES LOCALES -->
+<section class="card">
+  <div class="card-h"><span class="num">1</span><h2>Mes notes sur cet appareil</h2><span class="pill" id="localPill"><span class="d"></span><span id="localTxt">Analyse…</span></span></div>
+  <div class="card-b">
+    <div id="localBody"></div>
+  </div>
+</section>
+
+<!-- 2. COFFRE -->
+<section class="card">
+  <div class="card-h"><span class="num">2</span><h2>Vérifier le coffre GitHub chiffré</h2><span class="pill" id="vaultPill"><span class="d"></span>En attente</span></div>
+  <div class="card-b">
+    <p class="lead">Indépendant du stockage local : si la tablette a perdu ses données, le coffre contient tout. Le déchiffrement se fait <b>ici, dans cette page</b> — le mot de passe n'est jamais envoyé.</p>
+    <div id="vaultForm">
+      <div class="field"><label for="vToken">Jeton GitHub (permission « gist »)</label><input id="vToken" type="password" autocomplete="off" spellcheck="false" placeholder="ghp_… ou github_pat_…"><span class="hint">Le même jeton que dans l'application. Il reste sur cet appareil.</span></div>
+      <div class="field"><label for="vPass">Mot de passe de chiffrement</label><input id="vPass" type="password" autocomplete="current-password" placeholder="Votre mot de passe"></div>
+      <div class="field"><label for="vGist">Identifiant du gist (optionnel)</label><input id="vGist" type="text" autocomplete="off" spellcheck="false" placeholder="Laissez vide : recherche automatique"></div>
+      <div class="row">
+        <button class="btn primary big" id="btnVault" data-act="vault"><svg viewBox="0 0 24 24"><path d="M17.5 19H6a4 4 0 0 1-.7-7.9 7 7 0 0 1 13.4-1.6A4.5 4.5 0 0 1 17.5 19Z"/></svg>Vérifier &amp; déchiffrer</button>
+        <button class="btn" data-act="prefill"><svg viewBox="0 0 24 24"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>Préremplir depuis cet appareil</button>
+      </div>
+      <div id="vaultOut"></div>
+      <p class="note">Mot de passe oublié : le contenu est mathématiquement illisible, personne ne peut le récupérer. Utilisez alors l'export d'un autre appareil (section 1 sur votre téléphone ou votre PC).</p>
+    </div>
+  </div>
+</section>
+
+<!-- 3. FICHIER -->
+<section class="card">
+  <div class="card-h"><span class="num">3</span><h2>Inspecter un fichier de sauvegarde</h2></div>
+  <div class="card-b">
+    <p class="lead">Vous avez déjà un <code>.json</code> exporté depuis le téléphone ou le PC ? Ouvrez-le ici pour vérifier son contenu et le convertir en CSV. Lecture seule.</p>
+    <div class="row">
+      <button class="btn" data-act="pick"><svg viewBox="0 0 24 24"><path d="m7 8 5-5 5 5"/><path d="M12 3v12"/><path d="M5 21h14"/></svg>Choisir un fichier JSON</button>
+    </div>
+    <input type="file" id="fileIn" accept=".json,application/json" hidden>
+    <div id="fileOut"></div>
+  </div>
+</section>
+
+<!-- 4. DIAGNOSTIC -->
+<section class="card">
+  <div class="card-h"><span class="num">4</span><h2>Diagnostic de cet appareil</h2><button class="btn" data-act="diag" style="height:30px;font-size:11.5px"><svg viewBox="0 0 24 24" style="width:14px;height:14px"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg>Actualiser</button></div>
+  <div class="card-b">
+    <div class="grid g3" id="facts"></div>
+    <div class="list" id="swList"></div>
+    <div class="row" style="margin-top:11px">
+      <button class="btn" data-act="copy"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copier le rapport</button>
+      <button class="btn" data-act="report"><svg viewBox="0 0 24 24"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>Télécharger le rapport (.txt)</button>
+    </div>
+    <pre class="report" id="report">Génération…</pre>
+    <p class="note">Ce rapport décrit uniquement le navigateur et la page. Il ne peut pas lire l'état d'Android, du clavier système ou du Play Store : aucune page web n'y a accès.</p>
+  </div>
+</section>
+
+<!-- 5. NETTOYAGE -->
+<section class="card">
+  <div class="card-h"><span class="num">5</span><h2>Nettoyer l'application de cet appareil</h2></div>
+  <div class="card-b">
+    <div class="alert">
+      <div class="ai"><svg viewBox="0 0 24 24"><path d="M12 3 2.5 19.5h19Z"/><path d="M12 10v4"/><path d="M12 17h.01"/></svg></div>
+      <div class="at"><b>Portée exacte de ce nettoyage</b>Il supprime le service worker, les caches et le stockage de site de <b>cette origine</b> dans <b>ce navigateur</b>. Il ne touche ni Android, ni le clavier, ni le Play Store, ni les autres applications. Exportez d'abord (section 1 ou 2).</div>
+    </div>
+    <label class="check"><input type="checkbox" id="ckSW" checked><span class="box"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></span><span class="ct"><b>Désinscrire les services workers</b>Supprime le cache hors-ligne de cette origine.</span></label>
+    <label class="check"><input type="checkbox" id="ckCache" checked><span class="box"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></span><span class="ct"><b>Vider les caches de cette origine</b>Fichiers de l'application mis en cache.</span></label>
+    <label class="check"><input type="checkbox" id="ckData"><span class="box"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></span><span class="ct"><b>Effacer aussi mes notes locales</b>À ne cocher qu'après un export vérifié. Irréversible sur cet appareil.</span></label>
+    <div class="row" style="margin-top:12px">
+      <button class="btn danger big" id="btnClean" data-act="clean"><svg viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/><path d="m6 7 1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/></svg>Nettoyer — cliquez pour armer</button>
+    </div>
+    <div id="cleanOut"></div>
+    <p class="note"><b>Pour désinstaller l'application installée</b> (icône sur l'écran d'accueil) : Paramètres Android → Applications → Réviz'Med → Désinstaller. Puis, dans Chrome : ⋮ → Paramètres → Paramètres des sites → Stockage → recherchez <code id="hostHint">…</code> → Effacer. C'est tout ce que l'application a jamais écrit sur la tablette.</p>
+  </div>
+</section>
+
+<!-- 6. TABLETTE -->
+<section class="card">
+  <div class="card-h"><span class="num">6</span><h2>Récupérer la Galaxy Tab A8 (SM-X200 · One UI 6.1)</h2></div>
+  <div class="card-b">
+    <div class="alert bad">
+      <div class="ai"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg></div>
+      <div class="at"><b>Une application web ne peut pas causer ces symptômes</b>Clavier système HS, Play Store qui se ferme seul, message « problème logiciel grave » : ce sont des composants système. Une PWA fermée n'exécute aucun code, n'a aucun accès au clavier ni aux autres apps, et n'écrit rien hors du stockage de Chrome. Le clavier + le Play Store qui échouent ensemble évoquent Services Google Play instables, une partition de données corrompue après le redémarrage forcé, un stockage saturé/défaillant, ou une mise à jour incomplète.</div>
+    </div>
+    <div class="steps">
+      <div class="step key"><span class="sn"></span><div class="st"><b>Test décisif : mode sécurisé</b>Maintenez Power → appui long sur « Éteindre » → <b>Mode sécurisé</b>. Toutes les apps tierces sont désactivées.
+        <ul>
+          <li>Clavier et Play Store <b>toujours en panne</b> → problème système/firmware, aucune app installée n'est responsable.</li>
+          <li>Ils <b>fonctionnent</b> → une app tierce interfère ; redémarrez normalement et désinstallez les apps récentes une par une.</li>
+        </ul>
+        Quittez le mode sécurisé en redémarrant.</div></div>
+      <div class="step"><span class="sn"></span><div class="st"><b>Vérifier l'espace de stockage</b>Paramètres → Maintenance de l'appareil → Stockage. Sous ~10 % de libre, Android et le clavier se comportent exactement comme décrit. Libérez plusieurs Go.</div></div>
+      <div class="step"><span class="sn"></span><div class="st"><b>Réinitialiser les composants en panne</b>Paramètres → Applications → affichez les apps système, puis pour chacun : <b>Clavier Samsung</b>, <b>Google Play Store</b>, <b>Services Google Play</b> → Stockage → <b>Vider le cache</b>, puis « Effacer les données » pour le Play Store et le clavier. Redémarrez.</div></div>
+      <div class="step"><span class="sn"></span><div class="st"><b>Mises à jour</b>Paramètres → Mise à jour logicielle → Télécharger et installer. Puis Play Store → profil → Gérer les applications → tout mettre à jour (Play Services inclus). Une mise à jour interrompue produit ce tableau.</div></div>
+      <div class="step"><span class="sn"></span><div class="st"><b>Vider la partition cache (recovery)</b>Éteignez la tablette. Sur Samsung Android 11+, <b>branchez-la en USB à un ordinateur</b>, puis maintenez <b>Volume Haut + Power</b> jusqu'au menu recovery. Choisissez <b>Wipe cache partition</b> (jamais « Wipe data » à cette étape), puis Reboot. Cette manipulation ne supprime aucune donnée personnelle.</div></div>
+      <div class="step"><span class="sn"></span><div class="st"><b>Diagnostic officiel Samsung</b>Application <b>Samsung Members</b> → Assistance → Diagnostics → testez clavier/écran tactile/stockage. Notez le message exact affiché par la tablette et son code : c'est l'information la plus utile pour le SAV.</div></div>
+      <div class="step warn"><span class="sn"></span><div class="st"><b>Sauvegarder avant toute réinitialisation</b>Samsung <b>Smart Switch</b> sur PC (sauvegarde complète) ou Paramètres → Comptes et sauvegarde. Pour Réviz'Med : export JSON depuis votre téléphone/PC, ou vérification du coffre (section 2). Vos notes ne dépendent pas de la tablette.</div></div>
+      <div class="step danger"><span class="sn"></span><div class="st"><b>Réinitialisation d'usine</b>Si tout le reste échoue : Paramètres → Gestion globale → Réinitialiser → Réinitialiser toutes les données. À faire <b>après</b> sauvegarde. Cela efface la tablette entière, pas seulement l'application.</div></div>
+      <div class="step danger"><span class="sn"></span><div class="st"><b>SAV / garantie</b>Si le message « problème logiciel grave » persiste après réinitialisation, ou si la tablette gèle à nouveau : panne matérielle probable (stockage eMMC). Contactez le support Samsung avec le rapport de la section 4 et le message système exact. La Tab A8 a 2 ans de garantie légale en UE.</div></div>
+    </div>
+    <p class="note">Je ne peux pas diagnostiquer Android à distance, et je ne prétends pas le faire : les étapes ci-dessus sont ordonnées du moins destructif au plus destructif, et le mode sécurisé (étape 1) tranche la question « application ou système » en une minute.</p>
+  </div>
+</section>
+
+<footer>
+  Réviz'Med — console de secours · fonctionne hors-ligne une fois chargée · aucun envoi réseau sauf vérification du coffre<br>
+  Vos notes vivent dans le stockage de chaque appareil et dans votre gist chiffré. Une page web ne peut pas modifier Android.
+</footer>
+</div>
+
+<div id="toasts" role="status" aria-live="polite"></div>
+
+<script>
+'use strict';
+const LSK='revizmed:v1', SYNC_KEY='revizmed:sync', VAULT_FILE='revizmed-vault.json';
+const KEYS=[LSK,SYNC_KEY,'revizmed:boot','revizmed:abrupt',LSK+'.corrupt'];
+const $=s=>document.querySelector(s);
+const $$=s=>[...document.querySelectorAll(s)];
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=v=>String(Math.round(v*100)/100).replace('.',',');
+const filled=c=>!!(c&&c.v!=null);
+const N=10;
+let LOCAL=null, VAULT=null, FILESTATE=null, DIAGTXT='';
+
+/* ---------- toasts ---------- */
+function toast(kind,msg,ms){
+  const w=$('#toasts');
+  while(w.children.length>=3)w.firstChild.remove();
+  const el=document.createElement('div');
+  el.className='toast '+kind;
+  el.innerHTML='<span class="tm">'+esc(msg)+'</span>';
+  w.appendChild(el);
+  setTimeout(()=>{el.classList.add('out');setTimeout(()=>el.remove(),220);},ms||4200);
+}
+function pill(id,cls,txt){
+  const p=$('#'+id);if(!p)return;
+  p.className='pill'+(cls?' '+cls:'');
+  const t=p.querySelector('span:last-child');if(t)t.textContent=txt;
+}
+function dl(name,content,mime){
+  const b=new Blob([content],{type:mime});
+  const u=URL.createObjectURL(b);
+  const a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(u),5000);
+}
+const stamp=()=>new Date().toISOString().slice(0,10);
+const dtf=new Intl.DateTimeFormat('fr-FR',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+
+/* ---------- analyse d'un état ---------- */
+function analyse(st){
+  if(!st||typeof st!=='object')return null;
+  const subs=Array.isArray(st.subjects)?st.subjects:[];
+  const types=Array.isArray(st.types)?st.types:[];
+  let devoirs=0;types.forEach(t=>devoirs+=(Array.isArray(t.items)?t.items.length:0));
+  const g=st.grades&&typeof st.grades==='object'?st.grades:{};
+  let notes=0,rows=0,last=0;
+  Object.keys(g).forEach(sid=>{
+    const sg=g[sid];if(!sg||typeof sg!=='object')return;
+    Object.keys(sg).forEach(k=>{
+      const a=sg[k];if(!Array.isArray(a))return;
+      let any=false;
+      a.forEach(c=>{if(filled(c)){notes++;any=true;if(c.t>last)last=c.t;}});
+      if(any)rows++;
+    });
+  });
+  return{subs:subs.length,types:types.length,devoirs,notes,rows,last,updatedAt:+st.updatedAt||0,seuil:st.settings&&isFinite(st.settings.seuil)?st.settings.seuil:10,max:st.settings&&isFinite(st.settings.max)?st.settings.max:20};
+}
+function factsHTML(a){
+  return '<div class="grid g3">'
+    +'<div class="fact ok"><b>'+a.notes+'</b><span>Notes saisies</span></div>'
+    +'<div class="fact"><b>'+a.rows+'</b><span>Devoirs commencés</span></div>'
+    +'<div class="fact"><b>'+a.subs+'</b><span>Matières</span></div>'
+    +'<div class="fact"><b>'+a.devoirs+'</b><span>Devoirs au programme</span></div>'
+    +'<div class="fact info"><b>'+(a.last?dtf.format(new Date(a.last)):'—')+'</b><span>Dernière note</span></div>'
+    +'<div class="fact"><b>'+fmt(a.seuil)+' / '+a.max+'</b><span>Seuil · barème</span></div>'
+    +'</div>';
+}
+function exportJSON(st,label){
+  dl('revizmed-'+label+'-'+stamp()+'.json',JSON.stringify({app:'revizmed',version:1,exportedAt:new Date().toISOString(),state:st},null,1),'application/json');
+  toast('ok','Sauvegarde JSON téléchargée ✓ Vérifiez le fichier dans Téléchargements.');
+}
+function csvOf(st){
+  const subs=Array.isArray(st.subjects)?st.subjects:[];
+  const types=Array.isArray(st.types)?st.types:[];
+  const g=st.grades||{};
+  const seuil=st.settings&&isFinite(st.settings.seuil)?st.settings.seuil:10;
+  const ov=st.overrides||{};
+  const rows=[['Matière','Catégorie','Type','Devoir',...Array.from({length:N},(_,i)=>'Essai '+(i+1)),'Dernière','Statut'].join(';')];
+  subs.forEach(s=>{
+    const th=isFinite(ov[s.id])?ov[s.id]:seuil;
+    types.forEach(t=>(t.items||[]).forEach(it=>{
+      const key=t.id+':'+it.id;
+      const a=(g[s.id]&&g[s.id][key])||[];
+      let lastV=null;
+      for(let i=N-1;i>=0;i--)if(filled(a[i])){lastV=a[i].v;break;}
+      const statut=lastV==null?'Non fait':(lastV>=th?'Validé':'À refaire');
+      rows.push([s.name,s.cat==='opt'?'Option':'Tronc commun',t.label,(t.single||t.label)+' '+it.label,
+        ...Array.from({length:N},(_,i)=>filled(a[i])?fmt(a[i].v):''),
+        lastV==null?'':fmt(lastV),statut].map(x=>String(x).replace(/;/g,',')).join(';'));
+    }));
+  });
+  return '\uFEFF'+rows.join('\r\n');
+}
+function exportCSV(st,label){
+  dl('revizmed-'+label+'-'+stamp()+'.csv',csvOf(st),'text/csv;charset=utf-8');
+  toast('ok','CSV téléchargé ✓ Ouvrable dans Excel / LibreOffice.');
+}
+
+/* ---------- 1. local ---------- */
+function readLocal(){
+  const body=$('#localBody');
+  const isFile=location.protocol==='file:';
+  let raw=null,err=null;
+  try{raw=localStorage.getItem(LSK);}catch(e){err=e;}
+  if(err||isFile){
+    pill('localPill','warn','Illisible ici');
+    body.innerHTML='<div class="alert'+(isFile?'':' warn')+'"><div class="ai"><svg viewBox="0 0 24 24"><path d="M12 3 2.5 19.5h19Z"/><path d="M12 10v4"/><path d="M12 17h.01"/></svg></div><div class="at"><b>'+(isFile?'Page ouverte en fichier local':'Stockage inaccessible')+'</b>'
+      +(isFile?'Pour lire les notes de l\'application, cette page doit être servie depuis la même adresse : <code>'+esc(location.origin==='null'?'https://VOTRE-PSEUDO.github.io/VOTRE-DEPOT/secours.html':'…')+'</code>. Ouvrez-la via GitHub Pages, pas en double-cliquant le fichier.':'Navigation privée ou stockage bloqué. Utilisez la section 2 (coffre) ou un export depuis un autre appareil.')
+      +'</div></div>'
+      +'<p class="note">Vos notes restent accessibles depuis l\'application sur votre téléphone ou votre PC : Réglages → Exporter la sauvegarde (JSON).</p>';
+    return;
+  }
+  if(!raw){
+    pill('localPill','warn','Aucune donnée');
+    body.innerHTML='<div class="alert"><div class="ai"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg></div><div class="at"><b>Rien dans le stockage de ce navigateur</b>Soit l\'application n\'a jamais été ouverte ici, soit ses données ont été effacées. Passez à la section 2 : le coffre GitHub contient vos notes.</div></div>';
+    return;
+  }
+  let st=null;
+  try{st=JSON.parse(raw);}catch(e){}
+  const a=analyse(st);
+  if(!a){
+    pill('localPill','bad','Données corrompues');
+    body.innerHTML='<div class="alert bad"><div class="ai"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg></div><div class="at"><b>Sauvegarde locale illisible</b>Le JSON est altéré. Vous pouvez en télécharger une copie brute pour analyse, puis utiliser le coffre (section 2).</div></div>'
+      +'<div class="row"><button class="btn" data-act="rawdump">Télécharger la copie brute</button></div>';
+    return;
+  }
+  LOCAL=st;
+  const ko=a.notes===0;
+  pill('localPill',ko?'warn':'ok',ko?'0 note':a.notes+' notes');
+  body.innerHTML=(ko
+    ?'<div class="alert"><div class="ai"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/></svg></div><div class="at"><b>Programme présent, aucune note</b>Le programme est enregistré mais aucune note n\'est saisie sur cet appareil. Vérifiez le coffre (section 2) avant tout nettoyage.</div></div>'
+    :'<div class="alert ok"><div class="ai"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></div><div class="at"><b>Vos notes sont là</b>Exportez maintenant, avant toute manipulation de la tablette. Le fichier JSON se réimporte dans l\'application sur n\'importe quel appareil.</div></div>')
+    +factsHTML(a)
+    +'<div class="row" style="margin-top:12px">'
+    +'<button class="btn primary big" data-act="exp-local-json"><svg viewBox="0 0 24 24"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>Exporter JSON (réimportable)</button>'
+    +'<button class="btn big" data-act="exp-local-csv"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Exporter CSV (Excel)</button>'
+    +'</div>'
+    +'<p class="note">Dernière écriture du stockage : '+(a.updatedAt?dtf.format(new Date(a.updatedAt)):'inconnue')+' · taille '+Math.round(raw.length/1024)+' Ko.</p>';
+}
+
+/* ---------- 2. coffre ---------- */
+const te=new TextEncoder(),td=new TextDecoder();
+const cryptoOK=()=>!!(window.crypto&&crypto.subtle&&crypto.getRandomValues);
+function b64d(s){const b=atob(s);const a=new Uint8Array(b.length);for(let i=0;i<b.length;i++)a[i]=b.charCodeAt(i);return a;}
+async function deriveKey(pass,salt,iter){
+  const km=await crypto.subtle.importKey('raw',te.encode(pass),'PBKDF2',false,['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:iter,hash:'SHA-256'},km,{name:'AES-GCM',length:256},false,['decrypt']);
+}
+async function gh(token,path){
+  const r=await fetch('https://api.github.com'+path,{headers:{'Authorization':'Bearer '+token,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'}});
+  if(r.status===401||r.status===403)throw new Error('Jeton refusé (401/403). Vérifiez la permission « gist ».');
+  if(r.status===404)throw new Error('Introuvable (404).');
+  if(!r.ok)throw new Error('GitHub a répondu '+r.status+'.');
+  return r.json();
+}
+async function findVault(token){
+  for(let p=1;p<=3;p++){
+    const list=await gh(token,'/gists?per_page=100&page='+p);
+    const hit=list.find(g=>g.files&&g.files[VAULT_FILE]);
+    if(hit)return hit.id;
+    if(list.length<100)break;
+  }
+  return null;
+}
+async function getEnv(token,id){
+  const g=await gh(token,'/gists/'+id);
+  const f=g.files&&g.files[VAULT_FILE];
+  if(!f)throw new Error('Fichier de coffre absent de ce gist.');
+  let content=f.content;
+  if(f.truncated&&f.raw_url){const r=await fetch(f.raw_url);content=await r.text();}
+  const env=JSON.parse(content);
+  if(!env||env.app!=='revizmed-vault')throw new Error('Ce fichier n\'est pas un coffre Réviz\'Med.');
+  return env;
+}
+async function verifyVault(){
+  const out=$('#vaultOut'),btn=$('#btnVault');
+  const token=$('#vToken').value.trim(),pass=$('#vPass').value;
+  let id=$('#vGist').value.trim();
+  out.innerHTML='';
+  if(!cryptoOK()){out.innerHTML='<div class="alert bad" style="margin-top:12px"><div class="ai">!</div><div class="at"><b>Chiffrement indisponible</b>Ouvrez cette page en HTTPS (GitHub Pages), pas en fichier local.</div></div>';return;}
+  if(!token){toast('warn','Collez votre jeton GitHub.');return;}
+  if(!pass){toast('warn','Saisissez le mot de passe de chiffrement.');return;}
+  btn.disabled=true;btn.textContent='Vérification…';pill('vaultPill','info','En cours');
+  try{
+    if(!id){id=await findVault(token);if(!id)throw new Error('Aucun coffre trouvé sur ce compte GitHub.');}
+    const env=await getEnv(token,id);
+    const key=await deriveKey(pass,b64d(env.kdf.salt),env.kdf.iter||310000);
+    let payload;
+    try{
+      const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64d(env.iv)},key,b64d(env.data));
+      payload=JSON.parse(td.decode(pt));
+    }catch(e){throw new Error('Mot de passe incorrect : le coffre ne se déchiffre pas.');}
+    const st={version:1,settings:{seuil:payload.seuil,max:payload.max,theme:'auto',sound:true,autoNext:true,demo:false},overrides:payload.overrides||{},grades:payload.grades||{},activity:payload.activity||[],subjects:payload.subjects,types:payload.types,meta:payload.meta,ui:{order:payload.order},updatedAt:payload.updatedAt};
+    const a=analyse(st);
+    VAULT={st,env,id};
+    pill('vaultPill','ok',a.notes+' notes');
+    out.innerHTML='<div class="alert ok" style="margin-top:12px"><div class="ai"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></div><div class="at"><b>Coffre intact et déchiffré</b>Gist <code>'+esc(String(id).slice(0,12))+'…</code> · dernière écriture '+(payload.updatedAt?dtf.format(new Date(payload.updatedAt)):'inconnue')+'. Vos notes sont en sécurité, indépendamment de la tablette.</div></div>'
+      +factsHTML(a)
+      +'<div class="row" style="margin-top:12px">'
+      +'<button class="btn primary" data-act="exp-vault-json">Exporter JSON (réimportable)</button>'
+      +'<button class="btn" data-act="exp-vault-csv">Exporter CSV</button>'
+      +'<button class="btn" data-act="exp-vault-raw">Exporter le coffre chiffré</button>'
+      +'</div>';
+    toast('ok','Coffre vérifié : '+a.notes+' notes ✓');
+  }catch(e){
+    pill('vaultPill','bad','Échec');
+    out.innerHTML='<div class="alert bad" style="margin-top:12px"><div class="ai"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg></div><div class="at"><b>Vérification impossible</b>'+esc(e.message||'Erreur inconnue.')+'</div></div>';
+    toast('bad',e.message||'Échec de la vérification.',6000);
+  }finally{
+    btn.disabled=false;btn.innerHTML='<svg viewBox="0 0 24 24"><path d="M17.5 19H6a4 4 0 0 1-.7-7.9 7 7 0 0 1 13.4-1.6A4.5 4.5 0 0 1 17.5 19Z"/></svg>Vérifier &amp; déchiffrer';
+  }
+}
+function prefill(){
+  let cfg=null;
+  try{cfg=JSON.parse(localStorage.getItem(SYNC_KEY));}catch(e){}
+  if(!cfg||!cfg.token){toast('warn','Aucune configuration de synchronisation enregistrée sur cet appareil.');return;}
+  $('#vToken').value=cfg.token;
+  if(cfg.gistId)$('#vGist').value=cfg.gistId;
+  if(cfg.pass)$('#vPass').value=cfg.pass;
+  toast('info','Jeton et identifiant préremplis'+(cfg.pass?' (mot de passe mémorisé)':' — saisissez le mot de passe')+'.');
+}
+
+/* ---------- 3. fichier ---------- */
+function pickFile(){$('#fileIn').click();}
+$('#fileIn').addEventListener('change',e=>{
+  const f=e.target.files&&e.target.files[0];e.target.value='';
+  if(!f)return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    const out=$('#fileOut');
+    try{
+      const p=JSON.parse(rd.result);
+      const st=p&&p.app==='revizmed'&&p.state?p.state:(p&&p.grades?p:null);
+      const a=analyse(st);
+      if(!a)throw new Error('Ce fichier ne contient pas de données Réviz\'Med reconnaissables.');
+      FILESTATE=st;
+      out.innerHTML='<div class="alert ok" style="margin-top:12px"><div class="ai"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></div><div class="at"><b>'+esc(f.name)+'</b>Fichier valide, lu localement. Rien n\'a été modifié ni envoyé.</div></div>'
+        +factsHTML(a)
+        +'<div class="row" style="margin-top:12px"><button class="btn primary" data-act="exp-file-json">Réexporter JSON</button><button class="btn" data-act="exp-file-csv">Convertir en CSV</button></div>';
+      toast('ok','Fichier validé : '+a.notes+' notes ✓');
+    }catch(err){
+      out.innerHTML='<div class="alert bad" style="margin-top:12px"><div class="ai">!</div><div class="at"><b>Fichier illisible</b>'+esc(err.message||'JSON invalide.')+'</div></div>';
+      toast('bad','Fichier illisible.');
+    }
+  };
+  rd.onerror=()=>toast('bad','Lecture du fichier impossible.');
+  rd.readAsText(f);
+});
+
+/* ---------- 4. diagnostic ---------- */
+async function diagnose(){
+  const facts=$('#facts'),list=$('#swList');
+  let quota=null,used=null,persisted=null,lsOK=false;
+  try{const e=await navigator.storage.estimate();quota=e.quota;used=e.usage;}catch(_){}
+  try{persisted=await navigator.storage.persisted();}catch(_){}
+  try{localStorage.setItem('revizmed:probe','1');localStorage.removeItem('revizmed:probe');lsOK=true;}catch(_){}
+  const standalone=(()=>{try{return matchMedia('(display-mode: standalone)').matches||!!navigator.standalone;}catch(e){return false;}})();
+  const mem=navigator.deviceMemory||null,cores=navigator.hardwareConcurrency||null;
+  const mb=b=>b==null?'—':(b/1048576>=1024?(b/1073741824).toFixed(1)+' Go':Math.round(b/1048576)+' Mo');
+  const rows=[
+    ['Origine',location.origin==='null'?'fichier local':location.host||location.protocol,'info'],
+    ['Mode',standalone?'installée':'onglet',''],
+    ['Stockage libre (quota)',mb(quota),''],
+    ['Utilisé par le site',mb(used),''],
+    ['Stockage local',lsOK?'accessible':'bloqué',lsOK?'ok':'bad'],
+    ['Stockage persistant',persisted==null?'—':(persisted?'oui':'non'),persisted?'ok':'warn'],
+    ['Mémoire annoncée',mem?mem+' Go':'—',''],
+    ['Cœurs CPU',cores||'—',''],
+    ['Écran',screen.width+'×'+screen.height+' @'+(window.devicePixelRatio||1)+'x',''],
+    ['Réseau',navigator.onLine?'en ligne':'hors-ligne',navigator.onLine?'ok':'warn'],
+    ['Chiffrement WebCrypto',cryptoOK()?'disponible':'indisponible',cryptoOK()?'ok':'bad'],
+    ['Service worker','serviceWorker'in navigator?'supporté':'absent','']
+  ];
+  facts.innerHTML=rows.map(([k,v,c])=>'<div class="fact'+(c?' '+c:'')+'"><b style="font-size:'+(String(v).length>16?'13':'17')+'px">'+esc(v)+'</b><span>'+esc(k)+'</span></div>').join('');
+  let regs=[],cacheKeys=[];
+  try{regs=await navigator.serviceWorker.getRegistrations();}catch(_){}
+  try{cacheKeys=await caches.keys();}catch(_){}
+  list.innerHTML=
+    '<div class="li"><span class="lt"><b>Services workers</b> · '+regs.length+' enregistré(s)'+(regs.length?' — '+regs.map(r=>esc(r.scope)).join(', '):'')+'</span></div>'
+    +'<div class="li"><span class="lt"><b>Caches</b> · '+cacheKeys.length+' entrée(s)'+(cacheKeys.length?' — '+cacheKeys.map(esc).join(', '):'')+'</span></div>'
+    +'<div class="li"><span class="lt"><b>Clés de stockage Réviz\'Med</b> · '+KEYS.filter(k=>{try{return localStorage.getItem(k)!=null;}catch(e){return false;}}).map(esc).join(', ').replace(/^$/,'aucune')+'</span></div>';
+  DIAGTXT=[
+    'RAPPORT RÉVIZ\'MED — CONSOLE DE SECOURS',
+    'Généré le : '+new Date().toISOString(),
+    '',
+    '— Navigateur / page —',
+    'URL : '+location.href,
+    'User-Agent : '+navigator.userAgent,
+    'Langue : '+navigator.language+' · Fuseau : '+(Intl.DateTimeFormat().resolvedOptions().timeZone||'?'),
+    'Mode : '+(standalone?'application installée (standalone)':'onglet navigateur'),
+    'Écran : '+screen.width+'x'+screen.height+' px CSS, DPR '+(window.devicePixelRatio||1),
+    'Mémoire annoncée : '+(mem?mem+' Go':'non communiquée')+' · Cœurs : '+(cores||'?'),
+    'Réseau : '+(navigator.onLine?'en ligne':'hors-ligne'),
+    '',
+    '— Stockage du site —',
+    'localStorage : '+(lsOK?'accessible':'BLOQUÉ'),
+    'Quota : '+mb(quota)+' · Utilisé : '+mb(used),
+    'Persistant : '+(persisted==null?'inconnu':(persisted?'oui':'non')),
+    'WebCrypto : '+(cryptoOK()?'disponible':'INDISPONIBLE'),
+    'Services workers : '+regs.length+(regs.length?' ('+regs.map(r=>r.scope).join(', ')+')':''),
+    'Caches : '+cacheKeys.length+(cacheKeys.length?' ('+cacheKeys.join(', ')+')':''),
+    '',
+    '— Données Réviz\'Med —',
+    LOCAL?('Notes locales : '+analyse(LOCAL).notes+' · Matières : '+analyse(LOCAL).subs+' · Dernière note : '+(analyse(LOCAL).last?new Date(analyse(LOCAL).last).toISOString():'—')):'Notes locales : aucune / illisible',
+    VAULT?('Coffre vérifié : OUI · Gist '+VAULT.id+' · Notes : '+analyse(VAULT.st).notes):'Coffre vérifié : non',
+    '',
+    '— Limite de ce rapport —',
+    'Une page web ne peut pas lire l\'état d\'Android, du clavier système,',
+    'du Play Store ou des partitions. Pour ces éléments : Samsung Members',
+    '> Assistance > Diagnostics, et le message système exact affiché.',
+    '',
+    'Appareil concerné par l\'incident : Samsung Galaxy Tab A8 SM-X200, One UI 6.1 / Android 14.',
+    'Symptômes rapportés : gel puis redémarrage forcé ; clavier Samsung inopérant ;',
+    'Play Store se ferme immédiatement ; message système « problème logiciel grave ».'
+  ].join('\n');
+  $('#report').textContent=DIAGTXT;
+}
+async function copyReport(){
+  try{await navigator.clipboard.writeText(DIAGTXT);toast('ok','Rapport copié dans le presse-papiers ✓');}
+  catch(e){
+    const ta=document.createElement('textarea');ta.value=DIAGTXT;ta.style.position='fixed';ta.style.opacity='0';
+    document.body.appendChild(ta);ta.select();
+    try{document.execCommand('copy');toast('ok','Rapport copié ✓');}catch(_){toast('warn','Copie impossible : sélectionnez le texte du rapport manuellement.');}
+    ta.remove();
+  }
+}
+
+/* ---------- 5. nettoyage ---------- */
+let armed=false,armTimer=null;
+function armClean(){
+  const b=$('#btnClean');
+  if(!armed){
+    armed=true;b.textContent='Confirmer le nettoyage — cliquez à nouveau';
+    clearTimeout(armTimer);armTimer=setTimeout(()=>{armed=false;b.innerHTML=cleanLabel();},6000);
+    toast('warn','Cliquez à nouveau pour confirmer. Exportez d\'abord si ce n\'est pas fait.',6000);
+    return;
+  }
+  clearTimeout(armTimer);armed=false;b.innerHTML=cleanLabel();
+  doClean();
+}
+function cleanLabel(){return '<svg viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/><path d="m6 7 1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/></svg>Nettoyer — cliquez pour armer';}
+async function doClean(){
+  const out=$('#cleanOut'),done=[];
+  const wantData=$('#ckData').checked;
+  if(wantData&&!LOCAL&&!VAULT&&!FILESTATE){
+    if(!confirm('Aucun export n\'a été fait dans cette page. Effacer quand même les notes locales de cet appareil ?'))return;
+  }
+  try{
+    if($('#ckSW').checked){
+      const regs=await navigator.serviceWorker.getRegistrations();
+      let n=0;for(const r of regs){if(await r.unregister())n++;}
+      done.push(n+' service worker(s) désinscrit(s)');
+    }
+  }catch(e){done.push('services workers : '+e.message);}
+  try{
+    if($('#ckCache').checked){
+      const ks=await caches.keys();let n=0;
+      for(const k of ks){if(await caches.delete(k))n++;}
+      done.push(n+' cache(s) supprimé(s)');
+    }
+  }catch(e){done.push('caches : '+e.message);}
+  if(wantData){
+    let n=0;KEYS.forEach(k=>{try{if(localStorage.getItem(k)!=null){localStorage.removeItem(k);n++;}}catch(e){}});
+    done.push(n+' clé(s) de stockage effacée(s)');
+    LOCAL=null;
+  }
+  out.innerHTML='<div class="alert ok" style="margin-top:12px"><div class="ai"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></div><div class="at"><b>Nettoyage terminé</b>'+esc(done.join(' · '))+'.<br>Pour retirer l\'icône de l\'écran d\'accueil : Paramètres Android → Applications → Réviz\'Med → Désinstaller.</div></div>';
+  toast('ok','Nettoyage effectué ✓');
+  readLocal();diagnose();
+}
+
+/* ---------- délégation ---------- */
+document.addEventListener('click',e=>{
+  const t=e.target.closest('[data-act]');if(!t)return;
+  switch(t.dataset.act){
+    case'exp-local-json':if(LOCAL)exportJSON(LOCAL,'appareil');break;
+    case'exp-local-csv':if(LOCAL)exportCSV(LOCAL,'appareil');break;
+    case'rawdump':{try{dl('revizmed-brut-'+stamp()+'.txt',localStorage.getItem(LSK)||'','text/plain');toast('ok','Copie brute téléchargée.');}catch(e){toast('bad','Lecture impossible.');}break;}
+    case'vault':verifyVault();break;
+    case'prefill':prefill();break;
+    case'exp-vault-json':if(VAULT)exportJSON(VAULT.st,'coffre');break;
+    case'exp-vault-csv':if(VAULT)exportCSV(VAULT.st,'coffre');break;
+    case'exp-vault-raw':if(VAULT){dl('revizmed-coffre-chiffre-'+stamp()+'.json',JSON.stringify(VAULT.env,null,1),'application/json');toast('ok','Coffre chiffré téléchargé ✓');}break;
+    case'pick':pickFile();break;
+    case'exp-file-json':if(FILESTATE)exportJSON(FILESTATE,'fichier');break;
+    case'exp-file-csv':if(FILESTATE)exportCSV(FILESTATE,'fichier');break;
+    case'diag':diagnose();toast('info','Diagnostic actualisé.');break;
+    case'copy':copyReport();break;
+    case'report':dl('revizmed-rapport-'+stamp()+'.txt',DIAGTXT,'text/plain;charset=utf-8');toast('ok','Rapport téléchargé ✓');break;
+    case'clean':armClean();break;
+  }
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&e.target.id==='vPass'){verifyVault();e.preventDefault();}
+});
+
+/* ---------- init ---------- */
+$('#originTxt').textContent=location.protocol==='file:'?'fichier local':(location.host||'origine inconnue');
+$('#originPill').className='pill '+(location.protocol==='https:'?'ok':(location.protocol==='file:'?'bad':'warn'));
+$('#hostHint').textContent=location.host||'votre-adresse.github.io';
+if(!cryptoOK()){
+  $('#vaultForm').insertAdjacentHTML('afterbegin','<div class="alert bad"><div class="ai">!</div><div class="at"><b>HTTPS requis</b>Le déchiffrement n\'est pas disponible sur cette adresse. Ouvrez la page via GitHub Pages en https://.</div></div>');
+}
+readLocal();
+diagnose();
+</script>
+</body>
+</html>
